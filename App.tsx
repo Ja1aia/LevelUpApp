@@ -49,6 +49,7 @@ export default function App() {
         <ResultsScreen
           username={username}
           answers={answers}
+          questions={QUESTIONS}
           onPlayAgain={handlePlayAgain}
         />
       )}

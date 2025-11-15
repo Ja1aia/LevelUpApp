@@ -30,9 +30,9 @@ export default function HomeScreen({ onStartQuiz }: HomeScreenProps) {
     >
       <View style={styles.content}>
         {/* Logo */}
-        <View style={styles.logoContainer}>
+        {/* <View style={styles.logoContainer}>
           <Text style={styles.logoText}>LevelUp</Text>
-        </View>
+        </View> */}
 
         {/* Title */}
         <Text style={styles.title}>LevelUp</Text>
@@ -79,7 +79,7 @@ export default function HomeScreen({ onStartQuiz }: HomeScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: COLORS.background,
   },
   content: {
     flex: 1,

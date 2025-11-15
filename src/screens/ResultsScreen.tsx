@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,25 +7,43 @@ import {
   ScrollView,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
-import { Answer } from '../types';
+import { Answer, Question } from '../types';
 import { TOTAL_QUESTIONS } from '../utils/questions';
 
 interface ResultsScreenProps {
   username: string;
   answers: Answer[];
+  questions: Question[];
   onPlayAgain: () => void;
 }
 
 export default function ResultsScreen({
   username,
   answers,
+  questions,
   onPlayAgain,
 }: ResultsScreenProps) {
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(
+    new Set()
+  );
+
   const correctCount = answers.filter((a) => a.isCorrect).length;
   const wrongCount = answers.length - correctCount;
   const percentage = Math.round((correctCount / TOTAL_QUESTIONS) * 100);
   const averageTime =
     answers.reduce((sum, a) => sum + a.timeSpent, 0) / answers.length;
+
+  const toggleQuestion = (index: number) => {
+    setExpandedQuestions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
 
   const getResultEmoji = () => {
     if (percentage >= 80) return '🏆';
@@ -82,23 +100,67 @@ export default function ResultsScreen({
       {/* Answer Breakdown */}
       <View style={styles.breakdownContainer}>
         <Text style={styles.breakdownTitle}>Answer Breakdown</Text>
-        {answers.map((answer, index) => (
-          <View
-            key={index}
-            style={[
-              styles.answerItem,
-              answer.isCorrect ? styles.answerCorrect : styles.answerWrong,
-            ]}
-          >
-            <Text style={styles.answerNumber}>Q{index + 1}</Text>
-            <Text style={styles.answerIcon}>
-              {answer.isCorrect ? '✅' : '❌'}
-            </Text>
-            <Text style={styles.answerTime}>
-              {answer.timeSpent.toFixed(1)}s
-            </Text>
-          </View>
-        ))}
+        {answers.map((answer, index) => {
+          const question = questions.find((q) => q.id === answer.questionId);
+          const isExpanded = expandedQuestions.has(index);
+
+          if (!question) return null;
+
+          return (
+            <View key={index}>
+              <TouchableOpacity
+                style={[
+                  styles.answerItem,
+                  answer.isCorrect ? styles.answerCorrect : styles.answerWrong,
+                ]}
+                onPress={() => toggleQuestion(index)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.answerNumber}>Q{index + 1}</Text>
+                <Text style={styles.answerIcon}>
+                  {answer.isCorrect ? '✅' : '❌'}
+                </Text>
+                <Text style={styles.answerTime}>
+                  {answer.timeSpent.toFixed(1)}s
+                </Text>
+                <Text style={styles.expandIcon}>{isExpanded ? '▼' : '▶'}</Text>
+              </TouchableOpacity>
+
+              {isExpanded && (
+                <View style={styles.answerDetails}>
+                  <Text style={styles.questionText}>{question.question}</Text>
+
+                  <View style={styles.answerOption}>
+                    <Text style={styles.answerLabel}>Your Answer:</Text>
+                    <Text
+                      style={[
+                        styles.answerValue,
+                        answer.isCorrect
+                          ? styles.correctText
+                          : styles.incorrectText,
+                      ]}
+                    >
+                      {question.options[answer.selectedOption]}
+                    </Text>
+                  </View>
+
+                  {!answer.isCorrect && (
+                    <View style={styles.answerOption}>
+                      <Text style={styles.answerLabel}>Correct Answer:</Text>
+                      <Text style={[styles.answerValue, styles.correctText]}>
+                        {question.options[question.correctAnswer]}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={styles.topicBadge}>
+                    <Text style={styles.topicText}>{question.topic}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          );
+        })}
       </View>
 
       {/* Buttons */}
@@ -240,6 +302,65 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     marginLeft: 'auto',
+  },
+  expandIcon: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    marginLeft: 8,
+  },
+  answerDetails: {
+    backgroundColor: COLORS.white,
+    padding: 16,
+    marginTop: -8,
+    marginBottom: 8,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  questionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 16,
+    lineHeight: 24,
+  },
+  answerOption: {
+    marginBottom: 12,
+  },
+  answerLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  answerValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#F5F5F5',
+  },
+  correctText: {
+    color: '#2E7D32',
+    backgroundColor: '#E8F5E9',
+  },
+  incorrectText: {
+    color: '#C62828',
+    backgroundColor: '#FFEBEE',
+  },
+  topicBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  topicText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
   },
   playAgainButton: {
     backgroundColor: COLORS.primary,

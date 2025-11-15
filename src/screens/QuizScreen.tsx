@@ -270,15 +270,24 @@ const styles = StyleSheet.create({
   optionButtonCorrect: {
     backgroundColor: COLORS.success,
     borderColor: COLORS.success,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
   },
   optionButtonWrong: {
     backgroundColor: COLORS.error,
     borderColor: COLORS.error,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
   },
   optionButtonDisabled: {
     backgroundColor: COLORS.white,
     borderColor: COLORS.border,
-    opacity: 0.5,
+    opacity: 0.5,    
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
   },
   optionText: {
     fontSize: 18,
