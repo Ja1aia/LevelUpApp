@@ -7,8 +7,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
+import { getOrCreateUser } from '../services/database';
 
 interface HomeScreenProps {
   onStartQuiz: (username: string) => void;
@@ -16,10 +19,38 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ onStartQuiz }: HomeScreenProps) {
   const [username, setUsername] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleStart = () => {
-    if (username.trim()) {
-      onStartQuiz(username.trim());
+  const handleStart = async () => {
+    if (!username.trim()) return;
+
+    setLoading(true);
+
+    try {
+      // Test Supabase connection by creating/getting user
+      const { data, error } = await getOrCreateUser(username.trim());
+
+      if (error) {
+        Alert.alert(
+          'Connection Error',
+          'Failed to connect to database. Please check your internet connection.',
+          [{ text: 'OK' }]
+        );
+        console.error('Supabase error:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
+        console.log('✅ Supabase connection successful!', data);
+        console.log('🎮 Navigating to quiz...');
+        // Auto-navigate to quiz screen after successful connection
+        onStartQuiz(username.trim());
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+      setLoading(false);
     }
   };
 
@@ -56,13 +87,17 @@ export default function HomeScreen({ onStartQuiz }: HomeScreenProps) {
         <TouchableOpacity
           style={[
             styles.button,
-            !username.trim() && styles.buttonDisabled,
+            (!username.trim() || loading) && styles.buttonDisabled,
           ]}
           onPress={handleStart}
-          disabled={!username.trim()}
+          disabled={!username.trim() || loading}
           activeOpacity={0.8}
         >
-          <Text style={styles.buttonText}>START QUIZ</Text>
+          {loading ? (
+            <ActivityIndicator color={COLORS.textPrimary} />
+          ) : (
+            <Text style={styles.buttonText}>START QUIZ</Text>
+          )}
         </TouchableOpacity>
 
         {/* Info */}

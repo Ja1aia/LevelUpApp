@@ -9,6 +9,7 @@ import {
 import { COLORS } from '../theme/colors';
 import { Question, Answer } from '../types';
 import { TIMER_DURATION, TOTAL_QUESTIONS } from '../utils/questions';
+import PlayerCard from '../components/PlayerCard';
 
 interface QuizScreenProps {
   username: string;
@@ -27,8 +28,31 @@ export default function QuizScreen({
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
 
+  // Mock opponent state
+  const [opponentScore, setOpponentScore] = useState(0);
+  const [opponentAnswered, setOpponentAnswered] = useState(false);
+
   const currentQuestion = questions[currentIndex];
   const progress = ((currentIndex + 1) / TOTAL_QUESTIONS) * 100;
+
+  // Mock opponent behavior (Smart: 70% correct)
+  useEffect(() => {
+    setOpponentAnswered(false);
+
+    // Random delay between 2-6 seconds
+    const randomDelay = Math.random() * 4000 + 2000;
+
+    const timer = setTimeout(() => {
+      // 70% chance to answer correctly
+      const isCorrect = Math.random() < 0.7;
+      if (isCorrect) {
+        setOpponentScore((prev) => prev + 1);
+      }
+      setOpponentAnswered(true);
+    }, randomDelay);
+
+    return () => clearTimeout(timer);
+  }, [currentIndex]);
 
   // Timer countdown
   useEffect(() => {
@@ -128,15 +152,24 @@ export default function QuizScreen({
         <View style={[styles.progressBar, { width: `${progress}%` }]} />
       </View>
 
-      {/* Player Card */}
-      <View style={styles.playerCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>😊</Text>
-        </View>
-        <Text style={styles.playerName}>{username}</Text>
-        <Text style={styles.playerScore}>
-          {answers.filter((a) => a.isCorrect).length} / {currentIndex}
-        </Text>
+      {/* Battle Mode: 2 Player Cards (Horizontal) */}
+      <View style={styles.playersContainer}>
+        <PlayerCard
+          username={username}
+          elo={1450}
+          currentScore={answers.filter((a) => a.isCorrect).length}
+          totalQuestions={currentIndex}
+          isYou={true}
+          avatar="😊"
+        />
+        <PlayerCard
+          username="Opponent"
+          elo={1280}
+          currentScore={opponentScore}
+          totalQuestions={currentIndex}
+          isYou={false}
+          avatar="🤖"
+        />
       </View>
 
       {/* Question */}
@@ -202,43 +235,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderRadius: 4,
   },
-  playerCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
+  playersContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    gap: 12,
     marginBottom: 16,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarText: {
-    fontSize: 28,
-  },
-  playerName: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-  },
-  playerScore: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
   },
   questionCard: {
     backgroundColor: COLORS.white,

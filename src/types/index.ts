@@ -24,3 +24,19 @@ export interface Answer {
 export interface PlayerData {
   username: string;
 }
+
+export interface Player {
+  id: string;
+  username: string;
+  elo: number;
+  avatar: string;
+  currentScore: number;
+}
+
+export interface MultiplayerGameState {
+  roomId: string;
+  players: [Player, Player];
+  currentQuestionIndex: number;
+  isStarted: boolean;
+  isFinished: boolean;
+}
