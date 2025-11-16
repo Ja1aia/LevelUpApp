@@ -3,11 +3,12 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import HomeScreen from './src/screens/HomeScreen';
 import QuizScreen from './src/screens/QuizScreen';
+import WaitingForOpponentScreen from './src/screens/WaitingForOpponentScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
 import { Answer } from './src/types';
-import { QUESTIONS } from './src/utils/questions';
+import { QUESTIONS, TOTAL_QUESTIONS } from './src/utils/questions';
 
-type Screen = 'home' | 'quiz' | 'results';
+type Screen = 'home' | 'quiz' | 'waiting' | 'results';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -21,7 +22,11 @@ export default function App() {
 
   const handleQuizComplete = (quizAnswers: Answer[]) => {
     setAnswers(quizAnswers);
-    setCurrentScreen('results');
+    setCurrentScreen('waiting'); // Go to waiting screen first
+  };
+
+  const handleOpponentFinished = () => {
+    setCurrentScreen('results'); // Then go to results
   };
 
   const handlePlayAgain = () => {
@@ -42,6 +47,15 @@ export default function App() {
           username={username}
           questions={QUESTIONS}
           onQuizComplete={handleQuizComplete}
+        />
+      )}
+
+      {currentScreen === 'waiting' && (
+        <WaitingForOpponentScreen
+          username={username}
+          yourScore={answers.filter((a) => a.isCorrect).length}
+          totalQuestions={TOTAL_QUESTIONS}
+          onOpponentFinished={handleOpponentFinished}
         />
       )}
 

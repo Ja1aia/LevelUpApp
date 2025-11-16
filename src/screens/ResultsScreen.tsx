@@ -33,6 +33,29 @@ export default function ResultsScreen({
   const averageTime =
     answers.reduce((sum, a) => sum + a.timeSpent, 0) / answers.length;
 
+  // Mock opponent data (nanti dari Supabase)
+  const opponentScore = 3; // Fake: opponent dapat 3 correct
+  const opponentPercentage = Math.round((opponentScore / TOTAL_QUESTIONS) * 100);
+
+  // Mock opponent answers (fake data - nanti dari Supabase)
+  const opponentAnswers = [
+    { questionId: 1, selectedOption: 1, isCorrect: true },   // Q1: Correct
+    { questionId: 2, selectedOption: 0, isCorrect: false },  // Q2: Wrong
+    { questionId: 3, selectedOption: 1, isCorrect: true },   // Q3: Correct
+    { questionId: 4, selectedOption: 2, isCorrect: true },   // Q4: Correct
+    { questionId: 5, selectedOption: 0, isCorrect: false },  // Q5: Wrong
+  ]; // Total: 3 correct
+
+  // Determine winner
+  const isWinner = correctCount > opponentScore;
+  const isDraw = correctCount === opponentScore;
+
+  // Mock ELO changes (fake data)
+  const yourEloChange = isWinner ? +15 : isDraw ? 0 : -12;
+  const opponentEloChange = isWinner ? -12 : isDraw ? 0 : +15;
+  const yourCurrentElo = 1450; // Fake current ELO
+  const opponentCurrentElo = 1280; // Fake opponent ELO
+
   const toggleQuestion = (index: number) => {
     setExpandedQuestions((prev) => {
       const newSet = new Set(prev);
@@ -46,17 +69,15 @@ export default function ResultsScreen({
   };
 
   const getResultEmoji = () => {
-    if (percentage >= 80) return '🏆';
-    if (percentage >= 60) return '🎉';
-    if (percentage >= 40) return '👍';
+    if (isWinner) return '🏆';
+    if (isDraw) return '🤝';
     return '💪';
   };
 
   const getResultMessage = () => {
-    if (percentage >= 80) return 'Excellent!';
-    if (percentage >= 60) return 'Good Job!';
-    if (percentage >= 40) return 'Not Bad!';
-    return 'Keep Practicing!';
+    if (isWinner) return 'YOU WIN!';
+    if (isDraw) return 'DRAW!';
+    return 'YOU LOSE!';
   };
 
   return (
@@ -68,32 +89,84 @@ export default function ResultsScreen({
 
       {/* Result Message */}
       <Text style={styles.resultTitle}>{getResultMessage()}</Text>
-      <Text style={styles.username}>{username}</Text>
 
-      {/* Score Card */}
-      <View style={styles.scoreCard}>
-        <Text style={styles.scoreLabel}>Your Score</Text>
-        <Text style={styles.scoreValue}>
-          {correctCount} / {TOTAL_QUESTIONS}
-        </Text>
-        <Text style={styles.scorePercentage}>{percentage}%</Text>
-      </View>
+      {/* Battle Results: 2 Player Cards */}
+      <View style={styles.battleContainer}>
+        {/* Your Card */}
+        <View style={[styles.playerCard, isWinner && styles.playerCardWinner]}>
+          <View style={styles.playerHeader}>
+            <Text style={styles.playerAvatar}>😊</Text>
+            <Text style={styles.playerName} numberOfLines={1}>
+              {username}
+            </Text>
+          </View>
 
-      {/* Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{correctCount}</Text>
-          <Text style={styles.statLabel}>✅ Correct</Text>
+          <View style={styles.playerScore}>
+            <Text style={styles.scoreNumber}>{correctCount}</Text>
+            <Text style={styles.scoreTotal}>/{TOTAL_QUESTIONS}</Text>
+          </View>
+
+          <View style={styles.playerStats}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>ELO</Text>
+              <Text style={styles.statValue}>{yourCurrentElo}</Text>
+            </View>
+            <View style={styles.eloChangeContainer}>
+              <Text
+                style={[
+                  styles.eloChange,
+                  yourEloChange > 0
+                    ? styles.eloPositive
+                    : yourEloChange < 0
+                    ? styles.eloNegative
+                    : styles.eloNeutral,
+                ]}
+              >
+                {yourEloChange > 0 ? '+' : ''}
+                {yourEloChange} ⬆️
+              </Text>
+            </View>
+          </View>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{wrongCount}</Text>
-          <Text style={styles.statLabel}>❌ Wrong</Text>
+
+        {/* VS Divider */}
+        <View style={styles.vsDivider}>
+          <Text style={styles.vsText}>VS</Text>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{averageTime.toFixed(1)}s</Text>
-          <Text style={styles.statLabel}>⏱️ Avg Time</Text>
+
+        {/* Opponent Card */}
+        <View style={[styles.playerCard, !isWinner && !isDraw && styles.playerCardWinner]}>
+          <View style={styles.playerHeader}>
+            <Text style={styles.playerAvatar}>🤖</Text>
+            <Text style={styles.playerName}>Opponent</Text>
+          </View>
+
+          <View style={styles.playerScore}>
+            <Text style={styles.scoreNumber}>{opponentScore}</Text>
+            <Text style={styles.scoreTotal}>/{TOTAL_QUESTIONS}</Text>
+          </View>
+
+          <View style={styles.playerStats}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>ELO</Text>
+              <Text style={styles.statValue}>{opponentCurrentElo}</Text>
+            </View>
+            <View style={styles.eloChangeContainer}>
+              <Text
+                style={[
+                  styles.eloChange,
+                  opponentEloChange > 0
+                    ? styles.eloPositive
+                    : opponentEloChange < 0
+                    ? styles.eloNegative
+                    : styles.eloNeutral,
+                ]}
+              >
+                {opponentEloChange > 0 ? '+' : ''}
+                {opponentEloChange} {opponentEloChange > 0 ? '⬆️' : '⬇️'}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -130,8 +203,9 @@ export default function ResultsScreen({
                 <View style={styles.answerDetails}>
                   <Text style={styles.questionText}>{question.question}</Text>
 
+                  {/* Your Answer */}
                   <View style={styles.answerOption}>
-                    <Text style={styles.answerLabel}>Your Answer:</Text>
+                    <Text style={styles.answerLabel}>😊 Your Answer:</Text>
                     <Text
                       style={[
                         styles.answerValue,
@@ -140,13 +214,31 @@ export default function ResultsScreen({
                           : styles.incorrectText,
                       ]}
                     >
-                      {question.options[answer.selectedOption]}
+                      {question.options[answer.selectedOption]}{' '}
+                      {answer.isCorrect ? '✓' : '✗'}
                     </Text>
                   </View>
 
-                  {!answer.isCorrect && (
+                  {/* Opponent Answer */}
+                  <View style={styles.answerOption}>
+                    <Text style={styles.answerLabel}>🤖 Opponent Answer:</Text>
+                    <Text
+                      style={[
+                        styles.answerValue,
+                        opponentAnswers[index]?.isCorrect
+                          ? styles.correctText
+                          : styles.incorrectText,
+                      ]}
+                    >
+                      {question.options[opponentAnswers[index]?.selectedOption]}{' '}
+                      {opponentAnswers[index]?.isCorrect ? '✓' : '✗'}
+                    </Text>
+                  </View>
+
+                  {/* Show correct answer if both wrong */}
+                  {!answer.isCorrect && !opponentAnswers[index]?.isCorrect && (
                     <View style={styles.answerOption}>
-                      <Text style={styles.answerLabel}>Correct Answer:</Text>
+                      <Text style={styles.answerLabel}>✅ Correct Answer:</Text>
                       <Text style={[styles.answerValue, styles.correctText]}>
                         {question.options[question.correctAnswer]}
                       </Text>
@@ -171,10 +263,7 @@ export default function ResultsScreen({
       >
         <Text style={styles.playAgainText}>PLAY AGAIN</Text>
       </TouchableOpacity>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Great job! Keep practicing! 💚</Text>
-      </View>
+      
     </ScrollView>
   );
 }
@@ -199,12 +288,104 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: COLORS.primaryDark,
-    marginBottom: 8,
+    marginBottom: 24,
   },
   username: {
     fontSize: 20,
     color: COLORS.textSecondary,
     marginBottom: 24,
+  },
+  // Battle Results Styles
+  battleContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    marginBottom: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
+  playerCard: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 3,
+    borderColor: COLORS.border,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  playerCardWinner: {
+    borderColor: COLORS.primary,
+    borderWidth: 4,
+  },
+  playerHeader: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  playerAvatar: {
+    fontSize: 40,
+    marginBottom: 8,
+  },
+  playerName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+  playerScore: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  scoreNumber: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: COLORS.primaryDark,
+  },
+  scoreTotal: {
+    fontSize: 24,
+    color: COLORS.textSecondary,
+    marginLeft: 4,
+  },
+  playerStats: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingTop: 12,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  eloChangeContainer: {
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  eloChange: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  eloPositive: {
+    color: '#2E7D32',
+  },
+  eloNegative: {
+    color: '#C62828',
+  },
+  eloNeutral: {
+    color: COLORS.textSecondary,
+  },
+  vsDivider: {
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vsText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.textSecondary,
   },
   scoreCard: {
     backgroundColor: COLORS.white,
