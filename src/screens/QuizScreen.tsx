@@ -10,15 +10,21 @@ import { COLORS } from '../theme/colors';
 import { Question, Answer } from '../types';
 import { TIMER_DURATION, TOTAL_QUESTIONS } from '../utils/questions';
 import PlayerCard from '../components/PlayerCard';
+import { saveAnswer } from '../services/database';
+import { supabase } from '../lib/supabase';
 
 interface QuizScreenProps {
   username: string;
+  userId: string;
+  roomId: string;
   questions: Question[];
   onQuizComplete: (answers: Answer[]) => void;
 }
 
 export default function QuizScreen({
   username,
+  userId,
+  roomId,
   questions,
   onQuizComplete,
 }: QuizScreenProps) {
@@ -28,31 +34,145 @@ export default function QuizScreen({
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
 
-  // Mock opponent state
+  // Real opponent state (from Supabase)
   const [opponentScore, setOpponentScore] = useState(0);
   const [opponentAnswered, setOpponentAnswered] = useState(false);
+  const [opponentUsername, setOpponentUsername] = useState('Opponent');
+  const [opponentElo, setOpponentElo] = useState(1200);
+  const [userElo, setUserElo] = useState(1200);
 
   const currentQuestion = questions[currentIndex];
   const progress = ((currentIndex + 1) / TOTAL_QUESTIONS) * 100;
 
-  // Mock opponent behavior (Smart: 70% correct)
+  // Fetch player data on mount
   useEffect(() => {
-    setOpponentAnswered(false);
+    const fetchPlayerData = async () => {
+      try {
+        // Fetch current user's ELO
+        const { data: currentUser } = await supabase
+          .from('users')
+          .select('elo')
+          .eq('id', userId)
+          .single();
 
-    // Random delay between 2-6 seconds
-    const randomDelay = Math.random() * 4000 + 2000;
+        if (currentUser) {
+          setUserElo(currentUser.elo);
+        }
 
-    const timer = setTimeout(() => {
-      // 70% chance to answer correctly
-      const isCorrect = Math.random() < 0.7;
-      if (isCorrect) {
-        setOpponentScore((prev) => prev + 1);
+        // Get room to find opponent's ID
+        const { data: room } = await supabase
+          .from('rooms')
+          .select('host_id, guest_id')
+          .eq('id', roomId)
+          .single();
+
+        if (!room) {
+          console.error('Room not found');
+          return;
+        }
+
+        // Determine opponent's ID
+        const isPlayer1 = room.host_id === userId;
+        const opponentId = isPlayer1 ? room.guest_id : room.host_id;
+
+        if (!opponentId) {
+          console.log('Opponent not yet joined');
+          return;
+        }
+
+        // Fetch opponent's profile
+        const { data: opponent } = await supabase
+          .from('users')
+          .select('username, elo')
+          .eq('id', opponentId)
+          .single();
+
+        if (opponent) {
+          console.log('Opponent data loaded:', opponent);
+          setOpponentUsername(opponent.username);
+          setOpponentElo(opponent.elo);
+        }
+      } catch (err) {
+        console.error('Error fetching player data:', err);
       }
-      setOpponentAnswered(true);
-    }, randomDelay);
+    };
 
-    return () => clearTimeout(timer);
-  }, [currentIndex]);
+    fetchPlayerData();
+  }, [roomId, userId]);
+
+  // Real-time opponent subscription
+  useEffect(() => {
+    console.log('Setting up real-time subscription for room:', roomId);
+
+    // First, get room data to determine our role
+    const setupSubscription = async () => {
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('host_id, guest_id')
+        .eq('id', roomId)
+        .single();
+
+      if (!room) {
+        console.error('Room not found for subscription');
+        return null;
+      }
+
+      const isPlayer1 = room.host_id === userId;
+      console.log('User role:', isPlayer1 ? 'Player 1 (Host)' : 'Player 2 (Guest)');
+
+      // Subscribe to game_sessions changes
+      const subscription = supabase
+        .channel(`game:${roomId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen to INSERT and UPDATE
+            schema: 'public',
+            table: 'game_sessions',
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            console.log('Game session event:', payload.eventType, payload.new);
+
+            const session = payload.new;
+
+            // Check if this is for the current question
+            if (session.question_index === currentIndex) {
+              // Get opponent's answer based on our role
+              const opponentCorrect = isPlayer1
+                ? session.player2_correct
+                : session.player1_correct;
+
+              if (opponentCorrect !== null && opponentCorrect !== undefined) {
+                console.log('Opponent answered! Correct:', opponentCorrect);
+
+                // Update opponent score
+                if (opponentCorrect) {
+                  setOpponentScore((prev) => prev + 1);
+                }
+                setOpponentAnswered(true);
+              }
+            }
+          }
+        )
+        .subscribe();
+
+      return subscription;
+    };
+
+    let subscription: any = null;
+
+    setupSubscription().then((sub) => {
+      subscription = sub;
+    });
+
+    return () => {
+      if (subscription) {
+        console.log('Unsubscribing from game updates');
+        subscription.unsubscribe();
+      }
+    };
+  }, [roomId, currentIndex, userId]);
 
   // Timer countdown
   useEffect(() => {
@@ -68,7 +188,7 @@ export default function QuizScreen({
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  const handleTimeout = () => {
+  const handleTimeout = async () => {
     // Auto-submit with no answer (wrong)
     const timeSpent = (Date.now() - questionStartTime) / 1000;
     const answer: Answer = {
@@ -77,10 +197,40 @@ export default function QuizScreen({
       isCorrect: false,
       timeSpent,
     };
+
+    // Save timeout answer to Supabase
+    try {
+      console.log('Saving timeout answer to Supabase...', {
+        roomId,
+        questionIndex: currentIndex,
+        userId,
+        answer: -1,
+        timeSpent,
+        isCorrect: false,
+      });
+
+      const { error } = await saveAnswer(
+        roomId,
+        currentIndex,
+        userId,
+        -1, // -1 indicates timeout
+        timeSpent,
+        false
+      );
+
+      if (error) {
+        console.error('Error saving timeout answer:', error);
+      } else {
+        console.log('✅ Timeout answer saved!');
+      }
+    } catch (err) {
+      console.error('Unexpected error saving timeout:', err);
+    }
+
     proceedToNext(answer);
   };
 
-  const handleAnswer = (optionIndex: number) => {
+  const handleAnswer = async (optionIndex: number) => {
     if (selectedAnswer !== null) return; // Already answered
 
     const timeSpent = (Date.now() - questionStartTime) / 1000;
@@ -94,6 +244,35 @@ export default function QuizScreen({
     };
 
     setSelectedAnswer(optionIndex);
+
+    // Save answer to Supabase
+    try {
+      console.log('Saving answer to Supabase...', {
+        roomId,
+        questionIndex: currentIndex,
+        userId,
+        answer: optionIndex,
+        timeSpent,
+        isCorrect,
+      });
+
+      const { error } = await saveAnswer(
+        roomId,
+        currentIndex,
+        userId,
+        optionIndex,
+        timeSpent,
+        isCorrect
+      );
+
+      if (error) {
+        console.error('Error saving answer:', error);
+      } else {
+        console.log('✅ Answer saved successfully!');
+      }
+    } catch (err) {
+      console.error('Unexpected error saving answer:', err);
+    }
 
     // Show feedback for 1 second
     setTimeout(() => {
@@ -156,15 +335,15 @@ export default function QuizScreen({
       <View style={styles.playersContainer}>
         <PlayerCard
           username={username}
-          elo={1450}
+          elo={userElo}
           currentScore={answers.filter((a) => a.isCorrect).length}
           totalQuestions={currentIndex}
           isYou={true}
           avatar="😊"
         />
         <PlayerCard
-          username="Opponent"
-          elo={1280}
+          username={opponentUsername}
+          elo={opponentElo}
           currentScore={opponentScore}
           totalQuestions={currentIndex}
           isYou={false}

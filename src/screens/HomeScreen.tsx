@@ -14,7 +14,7 @@ import { COLORS } from '../theme/colors';
 import { getOrCreateUser } from '../services/database';
 
 interface HomeScreenProps {
-  onStartQuiz: (username: string) => void;
+  onStartQuiz: (username: string, userId: string) => void;
 }
 
 export default function HomeScreen({ onStartQuiz }: HomeScreenProps) {
@@ -43,9 +43,9 @@ export default function HomeScreen({ onStartQuiz }: HomeScreenProps) {
 
       if (data) {
         console.log('✅ Supabase connection successful!', data);
-        console.log('🎮 Navigating to quiz...');
-        // Auto-navigate to quiz screen after successful connection
-        onStartQuiz(username.trim());
+        console.log('🎮 Navigating to lobby...');
+        // Auto-navigate to lobby screen after successful connection
+        onStartQuiz(username.trim(), data.id);
       }
     } catch (err) {
       console.error('Unexpected error:', err);
@@ -96,7 +96,7 @@ export default function HomeScreen({ onStartQuiz }: HomeScreenProps) {
           {loading ? (
             <ActivityIndicator color={COLORS.textPrimary} />
           ) : (
-            <Text style={styles.buttonText}>START QUIZ</Text>
+            <Text style={styles.buttonText}>LOG IN</Text>
           )}
         </TouchableOpacity>
 

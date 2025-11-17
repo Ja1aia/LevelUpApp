@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { Answer, Question } from '../types';
 import { TOTAL_QUESTIONS } from '../utils/questions';
+import { supabase } from '../lib/supabase';
 
 interface ResultsScreenProps {
   username: string;
+  userId: string;
+  roomId: string;
   answers: Answer[];
   questions: Question[];
   onPlayAgain: () => void;
@@ -19,6 +23,8 @@ interface ResultsScreenProps {
 
 export default function ResultsScreen({
   username,
+  userId,
+  roomId,
   answers,
   questions,
   onPlayAgain,
@@ -27,34 +33,122 @@ export default function ResultsScreen({
     new Set()
   );
 
+  // Real opponent data state
+  const [loading, setLoading] = useState(true);
+  const [opponentUsername, setOpponentUsername] = useState('Opponent');
+  const [opponentAnswers, setOpponentAnswers] = useState<Answer[]>([]);
+  const [yourCurrentElo, setYourCurrentElo] = useState(1200);
+  const [opponentCurrentElo, setOpponentCurrentElo] = useState(1200);
+
   const correctCount = answers.filter((a) => a.isCorrect).length;
   const wrongCount = answers.length - correctCount;
   const percentage = Math.round((correctCount / TOTAL_QUESTIONS) * 100);
   const averageTime =
     answers.reduce((sum, a) => sum + a.timeSpent, 0) / answers.length;
 
-  // Mock opponent data (nanti dari Supabase)
-  const opponentScore = 3; // Fake: opponent dapat 3 correct
+  const opponentScore = opponentAnswers.filter((a) => a.isCorrect).length;
   const opponentPercentage = Math.round((opponentScore / TOTAL_QUESTIONS) * 100);
-
-  // Mock opponent answers (fake data - nanti dari Supabase)
-  const opponentAnswers = [
-    { questionId: 1, selectedOption: 1, isCorrect: true },   // Q1: Correct
-    { questionId: 2, selectedOption: 0, isCorrect: false },  // Q2: Wrong
-    { questionId: 3, selectedOption: 1, isCorrect: true },   // Q3: Correct
-    { questionId: 4, selectedOption: 2, isCorrect: true },   // Q4: Correct
-    { questionId: 5, selectedOption: 0, isCorrect: false },  // Q5: Wrong
-  ]; // Total: 3 correct
 
   // Determine winner
   const isWinner = correctCount > opponentScore;
   const isDraw = correctCount === opponentScore;
 
-  // Mock ELO changes (fake data)
+  // Calculate ELO changes (simplified K-factor = 32)
   const yourEloChange = isWinner ? +15 : isDraw ? 0 : -12;
   const opponentEloChange = isWinner ? -12 : isDraw ? 0 : +15;
-  const yourCurrentElo = 1450; // Fake current ELO
-  const opponentCurrentElo = 1280; // Fake opponent ELO
+
+  // Fetch opponent data from Supabase
+  useEffect(() => {
+    const fetchOpponentData = async () => {
+      try {
+        console.log('Fetching opponent data for room:', roomId);
+
+        // Get room to find opponent
+        const { data: room } = await supabase
+          .from('rooms')
+          .select('host_id, guest_id')
+          .eq('id', roomId)
+          .single();
+
+        if (!room) {
+          console.error('Room not found');
+          setLoading(false);
+          return;
+        }
+
+        const isPlayer1 = room.host_id === userId;
+        const opponentId = isPlayer1 ? room.guest_id : room.host_id;
+
+        if (!opponentId) {
+          console.error('Opponent not found');
+          setLoading(false);
+          return;
+        }
+
+        // Fetch opponent profile
+        const { data: opponent } = await supabase
+          .from('users')
+          .select('username, elo')
+          .eq('id', opponentId)
+          .single();
+
+        if (opponent) {
+          setOpponentUsername(opponent.username);
+          setOpponentCurrentElo(opponent.elo);
+        }
+
+        // Fetch current user ELO
+        const { data: currentUser } = await supabase
+          .from('users')
+          .select('elo')
+          .eq('id', userId)
+          .single();
+
+        if (currentUser) {
+          setYourCurrentElo(currentUser.elo);
+        }
+
+        // Fetch all game sessions for this room
+        const { data: sessions } = await supabase
+          .from('game_sessions')
+          .select('*')
+          .eq('room_id', roomId)
+          .order('question_index', { ascending: true });
+
+        if (sessions) {
+          // Build opponent answers array
+          const oppAnswers: Answer[] = sessions.map((session, index) => {
+            const oppAnswer = isPlayer1
+              ? session.player2_answer
+              : session.player1_answer;
+            const oppCorrect = isPlayer1
+              ? session.player2_correct
+              : session.player1_correct;
+            const oppTime = isPlayer1
+              ? session.player2_time
+              : session.player1_time;
+
+            return {
+              questionId: index + 1,
+              selectedOption: oppAnswer ?? -1,
+              isCorrect: oppCorrect ?? false,
+              timeSpent: oppTime ?? 0,
+            };
+          });
+
+          console.log('Opponent answers loaded:', oppAnswers);
+          setOpponentAnswers(oppAnswers);
+        }
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching opponent data:', err);
+        setLoading(false);
+      }
+    };
+
+    fetchOpponentData();
+  }, [roomId, userId]);
 
   const toggleQuestion = (index: number) => {
     setExpandedQuestions((prev) => {
@@ -79,6 +173,16 @@ export default function ResultsScreen({
     if (isDraw) return 'DRAW!';
     return 'YOU LOSE!';
   };
+
+  // Show loading while fetching opponent data
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading results...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -138,7 +242,7 @@ export default function ResultsScreen({
         <View style={[styles.playerCard, !isWinner && !isDraw && styles.playerCardWinner]}>
           <View style={styles.playerHeader}>
             <Text style={styles.playerAvatar}>🤖</Text>
-            <Text style={styles.playerName}>Opponent</Text>
+            <Text style={styles.playerName} numberOfLines={1}>{opponentUsername}</Text>
           </View>
 
           <View style={styles.playerScore}>
@@ -272,6 +376,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.primaryLight,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 18,
+    color: COLORS.textSecondary,
   },
   content: {
     padding: 20,

@@ -7,9 +7,12 @@ import {
   Animated,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
+import { supabase } from '../lib/supabase';
 
 interface WaitingForOpponentScreenProps {
   username: string;
+  userId: string;
+  roomId: string;
   yourScore: number;
   totalQuestions: number;
   onOpponentFinished: () => void;
@@ -17,11 +20,13 @@ interface WaitingForOpponentScreenProps {
 
 export default function WaitingForOpponentScreen({
   username,
+  userId,
+  roomId,
   yourScore,
   totalQuestions,
   onOpponentFinished,
 }: WaitingForOpponentScreenProps) {
-  const [opponentProgress, setOpponentProgress] = useState(3); // Mock: opponent di Q3
+  const [opponentProgress, setOpponentProgress] = useState(0);
   const [fadeAnim] = useState(new Animated.Value(0));
 
   // Fade in animation on mount
@@ -33,25 +38,109 @@ export default function WaitingForOpponentScreen({
     }).start();
   }, []);
 
-  // Mock opponent progress (nanti dari Supabase real-time)
+  // Real-time opponent progress tracking
   useEffect(() => {
-    // Simulate opponent answering questions
-    const interval = setInterval(() => {
-      setOpponentProgress((prev) => {
-        if (prev >= totalQuestions) {
-          clearInterval(interval);
-          // Opponent finished! Navigate to results after 1 second
-          setTimeout(() => {
-            onOpponentFinished();
-          }, 1000);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 2000); // Every 2 seconds, opponent answers 1 question
+    console.log('🔔 Setting up opponent progress tracking for room:', roomId);
 
-    return () => clearInterval(interval);
-  }, [totalQuestions, onOpponentFinished]);
+    let isPlayer1: boolean;
+    let hasFinished = false;
+
+    // Helper function to fetch and count opponent progress
+    const fetchOpponentProgress = async () => {
+      const { data: sessions } = await supabase
+        .from('game_sessions')
+        .select('*')
+        .eq('room_id', roomId);
+
+      if (sessions) {
+        const opponentAnsweredCount = sessions.filter((session) => {
+          const opponentAnswer = isPlayer1
+            ? session.player2_answer
+            : session.player1_answer;
+          return opponentAnswer !== null && opponentAnswer !== undefined;
+        }).length;
+
+        console.log('📊 Opponent progress:', opponentAnsweredCount, '/', totalQuestions);
+        setOpponentProgress(opponentAnsweredCount);
+
+        // Check if opponent finished
+        if (opponentAnsweredCount >= totalQuestions && !hasFinished) {
+          console.log('🎉 Opponent finished all questions!');
+          hasFinished = true;
+          setTimeout(() => onOpponentFinished(), 1000);
+        }
+
+        return opponentAnsweredCount;
+      }
+
+      return 0;
+    };
+
+    const trackOpponentProgress = async () => {
+      // Get room data to determine opponent
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('host_id, guest_id')
+        .eq('id', roomId)
+        .single();
+
+      if (!room) {
+        console.error('❌ Room not found');
+        return null;
+      }
+
+      isPlayer1 = room.host_id === userId;
+      console.log('👤 You are:', isPlayer1 ? 'Player 1 (Host)' : 'Player 2 (Guest)');
+      console.log('⏳ Waiting for:', isPlayer1 ? 'Player 2 (Guest)' : 'Player 1 (Host)');
+
+      // Fetch initial opponent progress
+      await fetchOpponentProgress();
+
+      // Subscribe to real-time updates
+      const subscription = supabase
+        .channel(`waiting:${roomId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'game_sessions',
+            filter: `room_id=eq.${roomId}`,
+          },
+          async (payload) => {
+            console.log('🔥 Game session updated (real-time):', payload.eventType);
+
+            // Refetch and recount instead of incrementing
+            await fetchOpponentProgress();
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Subscription status:', status);
+        });
+
+      return subscription;
+    };
+
+    let subscription: any = null;
+
+    trackOpponentProgress().then((sub) => {
+      subscription = sub;
+    });
+
+    // Fallback: Poll every 3 seconds
+    const pollInterval = setInterval(async () => {
+      console.log('🔍 Polling opponent progress...');
+      await fetchOpponentProgress();
+    }, 3000);
+
+    return () => {
+      console.log('🧹 Cleaning up opponent tracking');
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+      clearInterval(pollInterval);
+    };
+  }, [roomId, userId, totalQuestions, onOpponentFinished]);
 
   const progressPercentage = Math.round(
     (opponentProgress / totalQuestions) * 100
