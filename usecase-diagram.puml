@@ -1,0 +1,131 @@
+@startuml LevelUp Use Case Diagram
+' LevelUp - Math Battle Quiz Application
+' Use Case Diagram
+
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Player" as Player
+actor "Opponent\n(Mock/Real)" as Opponent
+actor "Supabase\nBackend" as Backend
+
+rectangle "LevelUp Math Battle Quiz System" {
+
+  ' Authentication & Profile
+  package "User Management" {
+    usecase "Enter Username" as UC1
+    usecase "Create Profile" as UC2
+    usecase "View Profile" as UC3
+    usecase "Track ELO Rating" as UC4
+  }
+
+  ' Single Player Mode
+  package "Quiz Mode" {
+    usecase "Start Quiz" as UC5
+    usecase "View Questions" as UC6
+    usecase "Answer Question" as UC7
+    usecase "View Timer\n(10 seconds)" as UC8
+    usecase "Get Answer\nFeedback" as UC9
+    usecase "View Progress Bar" as UC10
+  }
+
+  ' Results & Statistics
+  package "Results & Analytics" {
+    usecase "Wait for Opponent" as UC11
+    usecase "View Quiz Results" as UC12
+    usecase "View Score\nComparison" as UC13
+    usecase "View Answer\nBreakdown" as UC14
+    usecase "View Time\nAnalysis" as UC15
+    usecase "View ELO Change" as UC16
+    usecase "Play Again" as UC17
+  }
+
+  ' Multiplayer Features (Future)
+  package "Multiplayer Mode" #LightGray {
+    usecase "Create Room" as UC18
+    usecase "Join Room\n(via code)" as UC19
+    usecase "Battle Real\nOpponent" as UC20
+    usecase "View Leaderboard" as UC21
+  }
+
+  ' Internal System Features
+  package "System Features" {
+    usecase "Generate Questions" as SYS1
+    usecase "Calculate Score" as SYS2
+    usecase "Update ELO Rating" as SYS3
+    usecase "Sync Game Data" as SYS4
+    usecase "Simulate Mock\nOpponent" as SYS5
+  }
+}
+
+' Player Relationships
+Player --> UC1
+Player --> UC3
+Player --> UC5
+Player --> UC6
+Player --> UC7
+Player --> UC10
+Player --> UC11
+Player --> UC12
+Player --> UC13
+Player --> UC14
+Player --> UC15
+Player --> UC17
+
+' Multiplayer (Future Features)
+Player ..> UC18 : <<future>>
+Player ..> UC19 : <<future>>
+Player ..> UC20 : <<future>>
+Player ..> UC21 : <<future>>
+
+' Opponent Relationships
+Opponent --> UC7
+Opponent --> UC11
+
+' Backend Relationships
+Backend --> UC2
+Backend --> UC4
+Backend --> SYS3
+Backend --> SYS4
+
+' Include Relationships
+UC1 .> UC2 : <<include>>
+UC5 .> SYS1 : <<include>>
+UC7 .> UC8 : <<include>>
+UC7 .> UC9 : <<include>>
+UC7 .> SYS2 : <<include>>
+UC12 .> SYS2 : <<include>>
+UC12 .> UC13 : <<include>>
+UC12 .> UC14 : <<include>>
+UC12 .> UC16 : <<include>>
+UC17 .> UC5 : <<include>>
+
+' Extend Relationships
+UC11 .> SYS5 : <<extend>>
+UC12 .> SYS3 : <<extend>>
+UC12 .> SYS4 : <<extend>>
+UC18 .> UC20 : <<extend>>
+UC19 .> UC20 : <<extend>>
+
+' Notes
+note right of UC18
+  Fitur multiplayer
+  sudah ada UI dan
+  database schema,
+  belum diimplementasi
+  sepenuhnya
+end note
+
+note bottom of SYS5
+  Saat ini menggunakan
+  mock opponent dengan
+  success rate 70%
+end note
+
+note top of Player
+  Main actor yang
+  memainkan quiz
+  matematika
+end note
+
+@enduml
