@@ -100,51 +100,57 @@ export default function QuizScreen({
     fetchPlayerData();
   }, [roomId, userId]);
 
-  // Real-time opponent subscription
+  // Real-time opponent subscription - setup once, not per question
   useEffect(() => {
     console.log('Setting up real-time subscription for room:', roomId);
+    let subscription: any = null;
+    let isPlayer1: boolean | null = null;
+    let isMounted = true;
 
     // First, get room data to determine our role
     const setupSubscription = async () => {
-      const { data: room } = await supabase
-        .from('rooms')
-        .select('host_id, guest_id')
-        .eq('id', roomId)
-        .single();
+      try {
+        const { data: room, error } = await supabase
+          .from('rooms')
+          .select('host_id, guest_id')
+          .eq('id', roomId)
+          .single();
 
-      if (!room) {
-        console.error('Room not found for subscription');
-        return null;
-      }
+        if (error || !room) {
+          console.error('Room not found for subscription:', error);
+          return;
+        }
 
-      const isPlayer1 = room.host_id === userId;
-      console.log('User role:', isPlayer1 ? 'Player 1 (Host)' : 'Player 2 (Guest)');
+        if (!isMounted) return;
 
-      // Subscribe to game_sessions changes
-      const subscription = supabase
-        .channel(`game:${roomId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen to INSERT and UPDATE
-            schema: 'public',
-            table: 'game_sessions',
-            filter: `room_id=eq.${roomId}`,
-          },
-          (payload) => {
-            console.log('Game session event:', payload.eventType, payload.new);
+        isPlayer1 = room.host_id === userId;
+        console.log('User role:', isPlayer1 ? 'Player 1 (Host)' : 'Player 2 (Guest)');
 
-            const session = payload.new;
+        // Subscribe to game_sessions changes
+        subscription = supabase
+          .channel(`game:${roomId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*', // Listen to INSERT and UPDATE
+              schema: 'public',
+              table: 'game_sessions',
+              filter: `room_id=eq.${roomId}`,
+            },
+            (payload) => {
+              if (!isMounted) return;
 
-            // Check if this is for the current question
-            if (session.question_index === currentIndex) {
+              console.log('Game session event:', payload.eventType, payload.new);
+
+              const session = payload.new as any;
+
               // Get opponent's answer based on our role
               const opponentCorrect = isPlayer1
                 ? session.player2_correct
                 : session.player1_correct;
 
               if (opponentCorrect !== null && opponentCorrect !== undefined) {
-                console.log('Opponent answered! Correct:', opponentCorrect);
+                console.log('Opponent answered question', session.question_index, '! Correct:', opponentCorrect);
 
                 // Update opponent score
                 if (opponentCorrect) {
@@ -153,26 +159,25 @@ export default function QuizScreen({
                 setOpponentAnswered(true);
               }
             }
-          }
-        )
-        .subscribe();
-
-      return subscription;
-    };
-
-    let subscription: any = null;
-
-    setupSubscription().then((sub) => {
-      subscription = sub;
-    });
-
-    return () => {
-      if (subscription) {
-        console.log('Unsubscribing from game updates');
-        subscription.unsubscribe();
+          )
+          .subscribe((status) => {
+            console.log('Subscription status:', status);
+          });
+      } catch (err) {
+        console.error('Error setting up subscription:', err);
       }
     };
-  }, [roomId, currentIndex, userId]);
+
+    setupSubscription();
+
+    return () => {
+      isMounted = false;
+      if (subscription) {
+        console.log('Unsubscribing from game updates');
+        supabase.removeChannel(subscription);
+      }
+    };
+  }, [roomId, userId]);
 
   // Timer countdown
   useEffect(() => {
