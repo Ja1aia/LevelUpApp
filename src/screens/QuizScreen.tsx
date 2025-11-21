@@ -41,6 +41,9 @@ export default function QuizScreen({
   const [opponentElo, setOpponentElo] = useState(1200);
   const [userElo, setUserElo] = useState(1200);
 
+  // Track which questions have been processed to avoid duplicate counting
+  const processedOpponentQuestions = React.useRef<Set<number>>(new Set());
+
   const currentQuestion = questions[currentIndex];
   const timerProgress = (timeLeft / TIMER_DURATION) * 100;
 
@@ -143,6 +146,7 @@ export default function QuizScreen({
               console.log('Game session event:', payload.eventType, payload.new);
 
               const session = payload.new as any;
+              const questionIndex = session.question_index;
 
               // Get opponent's answer based on our role
               const opponentCorrect = isPlayer1
@@ -150,7 +154,16 @@ export default function QuizScreen({
                 : session.player1_correct;
 
               if (opponentCorrect !== null && opponentCorrect !== undefined) {
-                console.log('Opponent answered question', session.question_index, '! Correct:', opponentCorrect);
+                // Check if we've already processed this question to avoid duplicate counting
+                if (processedOpponentQuestions.current.has(questionIndex)) {
+                  console.log('Question', questionIndex, 'already processed, skipping');
+                  return;
+                }
+
+                // Mark this question as processed
+                processedOpponentQuestions.current.add(questionIndex);
+
+                console.log('Opponent answered question', questionIndex, '! Correct:', opponentCorrect);
 
                 // Update opponent score
                 if (opponentCorrect) {
