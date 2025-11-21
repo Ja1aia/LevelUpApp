@@ -213,6 +213,7 @@ export async function updateRoomStatus(
 
 /**
  * Save player answer for a question
+ * Uses upsert pattern to prevent race conditions
  */
 export async function saveAnswer(
   roomId: string,
@@ -223,14 +224,6 @@ export async function saveAnswer(
   isCorrect: boolean
 ) {
   try {
-    // Check if record exists for this question
-    const { data: existing } = await supabase
-      .from('game_sessions')
-      .select('*')
-      .eq('room_id', roomId)
-      .eq('question_index', questionIndex)
-      .single();
-
     // Get room to determine if player is player1 or player2
     const { data: room } = await supabase
       .from('rooms')
@@ -242,54 +235,60 @@ export async function saveAnswer(
 
     const isPlayer1 = room.host_id === playerId;
 
-    if (existing) {
-      // Update existing record
-      const updates = isPlayer1
-        ? {
-            player1_answer: answer,
-            player1_time: timeSpent,
-            player1_correct: isCorrect,
-          }
-        : {
-            player2_answer: answer,
-            player2_time: timeSpent,
-            player2_correct: isCorrect,
-          };
+    // Player-specific column updates
+    const playerData = isPlayer1
+      ? {
+          player1_answer: answer,
+          player1_time: timeSpent,
+          player1_correct: isCorrect,
+        }
+      : {
+          player2_answer: answer,
+          player2_time: timeSpent,
+          player2_correct: isCorrect,
+        };
 
-      const { data, error } = await supabase
-        .from('game_sessions')
-        .update(updates)
-        .eq('id', existing.id)
-        .select()
-        .single();
-
-      return { data, error };
-    } else {
-      // Create new record
-      const newRecord = {
+    // Try to insert first
+    const { data: inserted, error: insertError } = await supabase
+      .from('game_sessions')
+      .insert({
         room_id: roomId,
         question_index: questionIndex,
-        ...(isPlayer1
-          ? {
-              player1_answer: answer,
-              player1_time: timeSpent,
-              player1_correct: isCorrect,
-            }
-          : {
-              player2_answer: answer,
-              player2_time: timeSpent,
-              player2_correct: isCorrect,
-            }),
-      };
+        ...playerData,
+      })
+      .select()
+      .single();
 
-      const { data, error } = await supabase
+    // If insert succeeds, return
+    if (!insertError) {
+      console.log('✅ Answer inserted successfully');
+      return { data: inserted, error: null };
+    }
+
+    // If insert fails due to unique constraint, update instead
+    if (insertError.code === '23505') {
+      console.log('Record exists, updating instead...');
+
+      const { data: updated, error: updateError } = await supabase
         .from('game_sessions')
-        .insert(newRecord)
+        .update(playerData)
+        .eq('room_id', roomId)
+        .eq('question_index', questionIndex)
         .select()
         .single();
 
-      return { data, error };
+      if (updateError) {
+        console.error('Update failed:', updateError);
+        return { data: null, error: updateError };
+      }
+
+      console.log('✅ Answer updated successfully');
+      return { data: updated, error: null };
     }
+
+    // Other insert error
+    console.error('Insert failed:', insertError);
+    return { data: null, error: insertError };
   } catch (error) {
     console.error('saveAnswer error:', error);
     return { data: null, error };
