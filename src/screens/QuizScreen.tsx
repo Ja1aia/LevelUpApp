@@ -42,7 +42,7 @@ export default function QuizScreen({
   const [userElo, setUserElo] = useState(1200);
 
   const currentQuestion = questions[currentIndex];
-  const progress = ((currentIndex + 1) / TOTAL_QUESTIONS) * 100;
+  const timerProgress = (timeLeft / TIMER_DURATION) * 100;
 
   // Fetch player data on mount
   useEffect(() => {
@@ -331,9 +331,9 @@ export default function QuizScreen({
         </View>
       </View>
 
-      {/* Progress Bar */}
+      {/* Timer Progress Bar */}
       <View style={styles.progressBarContainer}>
-        <View style={[styles.progressBar, { width: `${progress}%` }]} />
+        <View style={[styles.progressBar, { width: `${timerProgress}%` }]} />
       </View>
 
       {/* Battle Mode: 2 Player Cards (Horizontal) */}
