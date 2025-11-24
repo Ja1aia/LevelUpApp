@@ -8,11 +8,12 @@ import WaitingForPlayerScreen from './src/screens/WaitingForPlayerScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import WaitingForOpponentScreen from './src/screens/WaitingForOpponentScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import { Answer } from './src/types';
 import { QUESTIONS, TOTAL_QUESTIONS } from './src/utils/questions';
 import { getOrCreateUser } from './src/services/database';
 
-type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results';
+type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -81,6 +82,14 @@ export default function App() {
           userId={userId}
           onRoomCreated={handleRoomCreated}
           onRoomJoined={handleRoomJoined}
+          onViewProfile={() => setCurrentScreen('profile')}
+        />
+      )}
+
+      {currentScreen === 'profile' && (
+        <ProfileScreen
+          userId={userId}
+          onBack={() => setCurrentScreen('lobby')}
         />
       )}
 

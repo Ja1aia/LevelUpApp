@@ -19,6 +19,7 @@ interface LobbyScreenProps {
   userId: string;
   onRoomCreated: (roomId: string, roomCode: string) => void;
   onRoomJoined: (roomId: string, roomCode: string) => void;
+  onViewProfile: () => void;
 }
 
 export default function LobbyScreen({
@@ -26,6 +27,7 @@ export default function LobbyScreen({
   userId,
   onRoomCreated,
   onRoomJoined,
+  onViewProfile,
 }: LobbyScreenProps) {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -114,11 +116,12 @@ export default function LobbyScreen({
           <Text style={styles.subtitle}>Choose your mode</Text>
         </View>
 
-        {/* User Info */}
-        <View style={styles.userCard}>
+        {/* User Info - Tap to view profile */}
+        <TouchableOpacity style={styles.userCard} onPress={onViewProfile} activeOpacity={0.7}>
           <Text style={styles.userEmoji}>👤</Text>
           <Text style={styles.userName}>{username}</Text>
-        </View>
+          <Text style={styles.profileHint}>View Profile →</Text>
+        </TouchableOpacity>
 
         {/* Create Room Section */}
         <View style={styles.section}>
@@ -237,6 +240,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#1A1A1A',
+    flex: 1,
+  },
+  profileHint: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
   section: {
     marginBottom: 24,

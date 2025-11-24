@@ -39,6 +39,8 @@ export default function ResultsScreen({
   const [opponentAnswers, setOpponentAnswers] = useState<Answer[]>([]);
   const [yourCurrentElo, setYourCurrentElo] = useState(1200);
   const [opponentCurrentElo, setOpponentCurrentElo] = useState(1200);
+  const [yourEloChange, setYourEloChange] = useState(0);
+  const [opponentEloChange, setOpponentEloChange] = useState(0);
 
   const correctCount = answers.filter((a) => a.isCorrect).length;
   const wrongCount = answers.length - correctCount;
@@ -52,10 +54,6 @@ export default function ResultsScreen({
   // Determine winner
   const isWinner = correctCount > opponentScore;
   const isDraw = correctCount === opponentScore;
-
-  // Calculate ELO changes (simplified K-factor = 32)
-  const yourEloChange = isWinner ? +15 : isDraw ? 0 : -12;
-  const opponentEloChange = isWinner ? -12 : isDraw ? 0 : +15;
 
   // Fetch opponent data from Supabase
   useEffect(() => {
@@ -77,9 +75,9 @@ export default function ResultsScreen({
         }
 
         const isPlayer1 = room.host_id === userId;
-        const opponentId = isPlayer1 ? room.guest_id : room.host_id;
+        const oppId = isPlayer1 ? room.guest_id : room.host_id;
 
-        if (!opponentId) {
+        if (!oppId) {
           console.error('Opponent not found');
           setLoading(false);
           return;
@@ -89,12 +87,14 @@ export default function ResultsScreen({
         const { data: opponent } = await supabase
           .from('users')
           .select('username, elo')
-          .eq('id', opponentId)
+          .eq('id', oppId)
           .single();
 
+        let oppElo = 1200;
         if (opponent) {
           setOpponentUsername(opponent.username);
           setOpponentCurrentElo(opponent.elo);
+          oppElo = opponent.elo;
         }
 
         // Fetch current user ELO
@@ -104,8 +104,10 @@ export default function ResultsScreen({
           .eq('id', userId)
           .single();
 
+        let yourElo = 1200;
         if (currentUser) {
           setYourCurrentElo(currentUser.elo);
+          yourElo = currentUser.elo;
         }
 
         // Fetch all game sessions for this room
@@ -138,6 +140,52 @@ export default function ResultsScreen({
 
           console.log('Opponent answers loaded:', oppAnswers);
           setOpponentAnswers(oppAnswers);
+
+          // Calculate scores
+          const yourScore = answers.filter((a) => a.isCorrect).length;
+          const oppScore = oppAnswers.filter((a) => a.isCorrect).length;
+
+          // Wait for database trigger to process game completion
+          // Poll for game_result
+          let attempts = 0;
+          const maxAttempts = 20; // 10 seconds max
+          let triggerSuccess = false;
+
+          while (attempts < maxAttempts) {
+            const { data: gameResult } = await supabase
+              .from('game_results')
+              .select('player1_elo_change, player2_elo_change')
+              .eq('room_id', roomId)
+              .single();
+
+            if (gameResult) {
+              // Database trigger completed!
+              console.log('✅ Game result from database trigger:', gameResult);
+              triggerSuccess = true;
+
+              if (isPlayer1) {
+                setYourEloChange(gameResult.player1_elo_change);
+                setOpponentEloChange(gameResult.player2_elo_change);
+              } else {
+                setYourEloChange(gameResult.player2_elo_change);
+                setOpponentEloChange(gameResult.player1_elo_change);
+              }
+
+              break;
+            }
+
+            // Wait 500ms before next check
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+          }
+
+          // If trigger didn't work within timeout, show error
+          if (!triggerSuccess) {
+            console.error('⚠️ Database trigger timeout - game result not created');
+            // Set changes to 0 as fallback display
+            setYourEloChange(0);
+            setOpponentEloChange(0);
+          }
         }
 
         setLoading(false);
