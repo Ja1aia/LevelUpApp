@@ -9,11 +9,12 @@ import QuizScreen from './src/screens/QuizScreen';
 import WaitingForOpponentScreen from './src/screens/WaitingForOpponentScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import MatchHistoryScreen from './src/screens/MatchHistoryScreen';
 import { Answer } from './src/types';
 import { QUESTIONS, TOTAL_QUESTIONS } from './src/utils/questions';
 import { getOrCreateUser } from './src/services/database';
 
-type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile';
+type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -83,11 +84,19 @@ export default function App() {
           onRoomCreated={handleRoomCreated}
           onRoomJoined={handleRoomJoined}
           onViewProfile={() => setCurrentScreen('profile')}
+          onViewMatchHistory={() => setCurrentScreen('matchHistory')}
         />
       )}
 
       {currentScreen === 'profile' && (
         <ProfileScreen
+          userId={userId}
+          onBack={() => setCurrentScreen('lobby')}
+        />
+      )}
+
+      {currentScreen === 'matchHistory' && (
+        <MatchHistoryScreen
           userId={userId}
           onBack={() => setCurrentScreen('lobby')}
         />

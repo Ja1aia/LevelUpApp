@@ -20,6 +20,7 @@ interface LobbyScreenProps {
   onRoomCreated: (roomId: string, roomCode: string) => void;
   onRoomJoined: (roomId: string, roomCode: string) => void;
   onViewProfile: () => void;
+  onViewMatchHistory: () => void;
 }
 
 export default function LobbyScreen({
@@ -28,10 +29,12 @@ export default function LobbyScreen({
   onRoomCreated,
   onRoomJoined,
   onViewProfile,
+  onViewMatchHistory,
 }: LobbyScreenProps) {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const handleCreateRoom = async () => {
     setLoading(true);
@@ -110,6 +113,49 @@ export default function LobbyScreen({
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <View style={styles.content}>
+        {/* Top Bar with Burger Menu */}
+        <View style={styles.topBar}>
+          <View style={styles.topBarSpacer} />
+
+          {/* Burger Menu Button */}
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setMenuVisible(!menuVisible)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.menuIcon}>☰</Text>
+          </TouchableOpacity>
+
+          {/* Dropdown Menu */}
+          {menuVisible && (
+            <View style={styles.dropdown}>
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setMenuVisible(false);
+                  onViewMatchHistory();
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.dropdownText}>📜 Match History</Text>
+              </TouchableOpacity>
+
+              <View style={styles.dropdownDivider} />
+
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setMenuVisible(false);
+                  // TODO: Navigate to Settings
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.dropdownText}>⚙️ Settings</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Multiplayer Battle</Text>
@@ -119,8 +165,10 @@ export default function LobbyScreen({
         {/* User Info - Tap to view profile */}
         <TouchableOpacity style={styles.userCard} onPress={onViewProfile} activeOpacity={0.7}>
           <Text style={styles.userEmoji}>👤</Text>
-          <Text style={styles.userName}>{username}</Text>
-          <Text style={styles.profileHint}>View Profile →</Text>
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{username}</Text>
+            <Text style={styles.tapHint}>Tap to view profile</Text>
+          </View>
         </TouchableOpacity>
 
         {/* Create Room Section */}
@@ -186,13 +234,6 @@ export default function LobbyScreen({
           </TouchableOpacity>
         </View>
 
-        {/* Info Card */}
-        <View style={styles.infoCard}>
-          <Text style={styles.infoIcon}>💡</Text>
-          <Text style={styles.infoText}>
-            Create a room and share the code with a friend, or join an existing room to start the battle!
-          </Text>
-        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -205,12 +246,73 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 24,
+    paddingHorizontal: 24,
     justifyContent: 'center',
+  },
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    zIndex: 100,
+  },
+  topBarSpacer: {
+    width: 44,
+  },
+  menuButton: {
+    padding: 10,
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
+  },
+  menuIcon: {
+    fontSize: 28,
+    color: '#1A1A1A',
+    fontWeight: 'bold',
+  },
+  dropdown: {
+    position: 'absolute',
+    top: 50,
+    right: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    minWidth: 200,
+    overflow: 'hidden',
+    zIndex: 1000,
+  },
+  dropdownItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: '#1A1A1A',
+    fontWeight: '500',
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: '#E5E5E5',
   },
   title: {
     fontSize: 32,
@@ -236,16 +338,18 @@ const styles = StyleSheet.create({
     fontSize: 28,
     marginRight: 12,
   },
+  userInfo: {
+    flex: 1,
+  },
   userName: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1A1A1A',
-    flex: 1,
   },
-  profileHint: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '500',
+  tapHint: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
   section: {
     marginBottom: 24,
