@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import HomeScreen from './src/screens/HomeScreen';
+import LoginScreen from './src/screens/LoginScreen';
 import LobbyScreen from './src/screens/LobbyScreen';
 import WaitingForPlayerScreen from './src/screens/WaitingForPlayerScreen';
 import QuizScreen from './src/screens/QuizScreen';
@@ -10,11 +10,11 @@ import WaitingForOpponentScreen from './src/screens/WaitingForOpponentScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import MatchHistoryScreen from './src/screens/MatchHistoryScreen';
+import MatchDetailsScreen from './src/screens/MatchDetailsScreen';
 import { Answer } from './src/types';
 import { QUESTIONS, TOTAL_QUESTIONS } from './src/utils/questions';
-import { getOrCreateUser } from './src/services/database';
 
-type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory';
+type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -23,10 +23,11 @@ export default function App() {
   const [roomId, setRoomId] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [selectedMatchId, setSelectedMatchId] = useState('');
 
   const handleStartQuiz = async (name: string, id: string) => {
     setUsername(name);
-    setUserId(id); // Store user ID from Supabase
+    setUserId(id);
     setCurrentScreen('lobby');
   };
 
@@ -74,64 +75,76 @@ export default function App() {
         <StatusBar style="dark" />
 
         {currentScreen === 'home' && (
-          <HomeScreen onStartQuiz={handleStartQuiz} />
+          <LoginScreen onLoginSuccess={handleStartQuiz} />
         )}
 
-      {currentScreen === 'lobby' && (
-        <LobbyScreen
-          username={username}
-          userId={userId}
-          onRoomCreated={handleRoomCreated}
-          onRoomJoined={handleRoomJoined}
-          onViewProfile={() => setCurrentScreen('profile')}
-          onViewMatchHistory={() => setCurrentScreen('matchHistory')}
-        />
-      )}
+        {currentScreen === 'lobby' && (
+          <LobbyScreen
+            username={username}
+            userId={userId}
+            onRoomCreated={handleRoomCreated}
+            onRoomJoined={handleRoomJoined}
+            onViewProfile={() => setCurrentScreen('profile')}
+            onViewMatchHistory={() => setCurrentScreen('matchHistory')}
+          />
+        )}
 
-      {currentScreen === 'profile' && (
-        <ProfileScreen
-          userId={userId}
-          onBack={() => setCurrentScreen('lobby')}
-        />
-      )}
+        {currentScreen === 'profile' && (
+          <ProfileScreen
+            userId={userId}
+            onBack={() => setCurrentScreen('lobby')}
+          />
+        )}
 
-      {currentScreen === 'matchHistory' && (
-        <MatchHistoryScreen
-          userId={userId}
-          onBack={() => setCurrentScreen('lobby')}
-        />
-      )}
+        {currentScreen === 'matchHistory' && (
+          <MatchHistoryScreen
+            userId={userId}
+            onBack={() => setCurrentScreen('lobby')}
+            onViewMatchDetails={(matchId) => {
+              setSelectedMatchId(matchId);
+              setCurrentScreen('matchDetails');
+            }}
+          />
+        )}
 
-      {currentScreen === 'waitingForPlayer' && (
-        <WaitingForPlayerScreen
-          roomId={roomId}
-          roomCode={roomCode}
-          username={username}
-          onPlayerJoined={handlePlayerJoined}
-          onCancel={handleCancelRoom}
-        />
-      )}
+        {currentScreen === 'matchDetails' && (
+          <MatchDetailsScreen
+            matchId={selectedMatchId}
+            userId={userId}
+            onBack={() => setCurrentScreen('matchHistory')}
+          />
+        )}
 
-      {currentScreen === 'quiz' && (
-        <QuizScreen
-          username={username}
-          userId={userId}
-          roomId={roomId}
-          questions={QUESTIONS}
-          onQuizComplete={handleQuizComplete}
-        />
-      )}
+        {currentScreen === 'waitingForPlayer' && (
+          <WaitingForPlayerScreen
+            roomId={roomId}
+            roomCode={roomCode}
+            username={username}
+            onPlayerJoined={handlePlayerJoined}
+            onCancel={handleCancelRoom}
+          />
+        )}
 
-      {currentScreen === 'waitingForOpponent' && (
-        <WaitingForOpponentScreen
-          username={username}
-          userId={userId}
-          roomId={roomId}
-          yourScore={answers.filter((a) => a.isCorrect).length}
-          totalQuestions={TOTAL_QUESTIONS}
-          onOpponentFinished={handleOpponentFinished}
-        />
-      )}
+        {currentScreen === 'quiz' && (
+          <QuizScreen
+            username={username}
+            userId={userId}
+            roomId={roomId}
+            questions={QUESTIONS}
+            onQuizComplete={handleQuizComplete}
+          />
+        )}
+
+        {currentScreen === 'waitingForOpponent' && (
+          <WaitingForOpponentScreen
+            username={username}
+            userId={userId}
+            roomId={roomId}
+            yourScore={answers.filter((a) => a.isCorrect).length}
+            totalQuestions={TOTAL_QUESTIONS}
+            onOpponentFinished={handleOpponentFinished}
+          />
+        )}
 
         {currentScreen === 'results' && (
           <ResultsScreen
