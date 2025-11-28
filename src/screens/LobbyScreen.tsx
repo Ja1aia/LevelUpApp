@@ -21,6 +21,7 @@ interface LobbyScreenProps {
   onRoomJoined: (roomId: string, roomCode: string) => void;
   onViewProfile: () => void;
   onViewMatchHistory: () => void;
+  onLogout: () => void;
 }
 
 export default function LobbyScreen({
@@ -30,6 +31,7 @@ export default function LobbyScreen({
   onRoomJoined,
   onViewProfile,
   onViewMatchHistory,
+  onLogout,
 }: LobbyScreenProps) {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,15 +46,21 @@ export default function LobbyScreen({
       // Generate unique room code
       const roomCode = generateRoomCode();
       console.log('Creating room with code:', roomCode);
+      console.log('Host userId:', userId);
+      console.log('Host username:', username);
 
       // Create room in Supabase
       const { data, error: createError } = await createRoom(userId, roomCode);
 
       if (createError || !data) {
         console.error('Error creating room:', createError);
+        console.error('Error details:', JSON.stringify(createError, null, 2));
+        const errorMessage = createError instanceof Error
+          ? createError.message
+          : (createError as any)?.message || 'Unknown error';
         Alert.alert(
           'Error',
-          'Failed to create room. Please try again.',
+          `Failed to create room: ${errorMessage}`,
           [{ text: 'OK' }]
         );
         setLoading(false);
@@ -62,9 +70,9 @@ export default function LobbyScreen({
       console.log('Room created successfully:', data);
       // Navigate to waiting screen
       onRoomCreated(data.id, roomCode);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Unexpected error:', err);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert('Error', err?.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -146,11 +154,22 @@ export default function LobbyScreen({
                 style={styles.dropdownItem}
                 onPress={() => {
                   setMenuVisible(false);
-                  // TODO: Navigate to Settings
+                  Alert.alert(
+                    'Logout',
+                    'Are you sure you want to logout?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Logout',
+                        style: 'destructive',
+                        onPress: onLogout
+                      }
+                    ]
+                  );
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.dropdownText}>⚙️ Settings</Text>
+                <Text style={[styles.dropdownText, { color: '#FF4444' }]}>🚪 Logout</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -247,7 +266,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    justifyContent: 'center',
+    paddingTop: 80,
   },
   topBar: {
     position: 'absolute',

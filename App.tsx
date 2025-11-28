@@ -13,6 +13,7 @@ import MatchHistoryScreen from './src/screens/MatchHistoryScreen';
 import MatchDetailsScreen from './src/screens/MatchDetailsScreen';
 import { Answer } from './src/types';
 import { QUESTIONS, TOTAL_QUESTIONS } from './src/utils/questions';
+import { supabase } from './src/lib/supabase';
 
 type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails';
 
@@ -25,7 +26,8 @@ export default function App() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState('');
 
-  const handleStartQuiz = async (name: string, id: string) => {
+  const handleStartQuiz = async (id: string, name: string) => {
+    console.log('handleStartQuiz - userId:', id, 'username:', name);
     setUsername(name);
     setUserId(id);
     setCurrentScreen('lobby');
@@ -69,6 +71,17 @@ export default function App() {
     setCurrentScreen('lobby'); // Back to lobby for new game
   };
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUsername('');
+      setUserId('');
+      setCurrentScreen('home');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
@@ -86,6 +99,7 @@ export default function App() {
             onRoomJoined={handleRoomJoined}
             onViewProfile={() => setCurrentScreen('profile')}
             onViewMatchHistory={() => setCurrentScreen('matchHistory')}
+            onLogout={handleLogout}
           />
         )}
 

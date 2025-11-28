@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 interface MatchHistoryProps {
   userId: string;
   onBack: () => void;
+  onViewMatchDetails: (matchId: string) => void;
 }
 
 interface MatchData {
@@ -25,7 +26,11 @@ interface MatchData {
   createdAt: string;
 }
 
-export default function MatchHistoryScreen({ userId, onBack }: MatchHistoryProps) {
+export default function MatchHistoryScreen({
+  userId,
+  onBack,
+  onViewMatchDetails
+}: MatchHistoryProps) {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,7 +167,11 @@ export default function MatchHistoryScreen({ userId, onBack }: MatchHistoryProps
   };
 
   const renderMatch = ({ item }: { item: MatchData }) => (
-    <View style={[styles.matchCard, { borderLeftColor: getResultColor(item.result) }]}>
+    <TouchableOpacity
+      style={[styles.matchCard, { borderLeftColor: getResultColor(item.result) }]}
+      onPress={() => onViewMatchDetails(item.id)}
+      activeOpacity={0.7}
+    >
       <View style={styles.matchHeader}>
         <View style={styles.resultSection}>
           <Text style={styles.resultIcon}>{getResultIcon(item.result)}</Text>
@@ -203,7 +212,12 @@ export default function MatchHistoryScreen({ userId, onBack }: MatchHistoryProps
           </Text>
         </View>
       </View>
-    </View>
+
+      {/* Tap indicator */}
+      <View style={styles.tapIndicator}>
+        <Text style={styles.tapText}>Tap for details →</Text>
+      </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -423,5 +437,17 @@ const styles = StyleSheet.create({
   eloChange: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  tapIndicator: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    alignItems: 'center',
+  },
+  tapText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
   },
 });

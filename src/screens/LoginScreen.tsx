@@ -6,11 +6,12 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  AppState,
 } from 'react-native';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { COLORS } from '../theme/colors';
 import { supabase } from '../lib/supabase';
-import * as WebBrowser from 'expo-web-browser';
 
 // Required for web browser authentication
 WebBrowser.maybeCompleteAuthSession();
@@ -51,6 +52,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         });
 
         if (accessToken) {
+          console.log('Access token found, setting session...');
           // Set session with the tokens
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -63,51 +65,24 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           } else if (data.user) {
             console.log('Session set successfully for user:', data.user.id);
             await handleSuccessfulAuth(data.user.id);
+          } else {
+            console.log('Session set but no user data returned');
           }
+        } else {
+          console.log('No access token found in URL');
         }
       } catch (error: any) {
         console.error('Error parsing OAuth callback:', error);
         Alert.alert('Authentication Failed', error.message);
       } finally {
-        setVerifying(false);
+        console.log('Setting verifying to false');
+        // We don't set verifying to false here immediately because we might be waiting for handleSuccessfulAuth
+        // But if we failed, we should probably let the user try again.
+        // For now, let's leave it true if successful to show loading, or false if error.
+        // Actually, handleSuccessfulAuth handles the success case navigation.
       }
     }
   };
-
-  useEffect(() => {
-    // Check for existing session on mount
-    checkExistingSession();
-
-    // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth event:', event, session?.user?.id);
-
-        if (event === 'SIGNED_IN' && session?.user) {
-          await handleSuccessfulAuth(session.user.id);
-        }
-      }
-    );
-
-    // Subscribe to URL events
-    const urlSubscription = Linking.addEventListener('url', handleUrl);
-
-    // Check initial URL (in case app was opened via deep link)
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleUrl({ url });
-      }
-    });
-
-    // Warm up the browser
-    WebBrowser.warmUpAsync();
-
-    return () => {
-      authListener.subscription.unsubscribe();
-      urlSubscription.remove();
-      WebBrowser.coolDownAsync();
-    };
-  }, []);
 
   const checkExistingSession = async () => {
     try {
@@ -122,43 +97,181 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     }
   };
 
+  useEffect(() => {
+    // Check for existing session on mount
+    checkExistingSession();
+
+    // Listen for AppState changes (background -> foreground)
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        console.log('App came to foreground, checking session...');
+        checkExistingSession();
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth event:', event, session?.user?.id);
+
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('SIGNED_IN event received, handling auth...');
+          await handleSuccessfulAuth(session.user.id);
+        }
+      }
+    );
+
+    // Subscribe to URL events
+    const urlSubscription = Linking.addEventListener('url', (event) => {
+      console.log('Linking event received:', event.url);
+      handleUrl(event);
+    });
+
+    // Check initial URL (in case app was opened via deep link)
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        console.log('Initial URL found:', url);
+        handleUrl({ url });
+      }
+    });
+
+    // Warm up the browser
+    WebBrowser.warmUpAsync();
+
+    return () => {
+      appStateSubscription.remove();
+      authListener.subscription.unsubscribe();
+      urlSubscription.remove();
+      WebBrowser.coolDownAsync();
+    };
+  }, []);
+
+  // Ref to track if auth is in progress to prevent race conditions
+  const isAuthInProgress = React.useRef(false);
+
   const handleSuccessfulAuth = async (userId: string) => {
+    if (isAuthInProgress.current) {
+      console.log('Auth already in progress for:', userId, 'skipping...');
+      return;
+    }
+
+    isAuthInProgress.current = true;
+    console.log('handleSuccessfulAuth called for:', userId);
+
     try {
-      // Check if user exists in database
-      const { data: userData } = await supabase
-        .from('users')
-        .select('id, username')
-        .eq('id', userId)
-        .single();
+      // Check if user exists in database with timeout
+      console.log('Checking if user exists in DB...');
+      console.log('Supabase URL:', process.env.EXPO_PUBLIC_SUPABASE_URL);
+
+      // Create a promise that will timeout after 30 seconds
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Database query timeout - please check your internet connection')), 30000)
+      );
+
+      const dbQueryPromise = (async () => {
+        console.log('Starting DB query for userId:', userId);
+
+        // First verify the session is properly set
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Current session user:', session?.user?.id);
+        console.log('Session access token exists:', !!session?.access_token);
+
+        if (!session) {
+          throw new Error('No active session found');
+        }
+
+        // Add a small delay to ensure session propagation
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const result = await supabase
+          .from('users')
+          .select('id, username')
+          .eq('id', userId)
+          .single();
+
+        console.log('DB query completed. Result:', result);
+        return result;
+      })();
+
+      const { data: userData, error: fetchError } = await Promise.race([
+        dbQueryPromise,
+        timeoutPromise
+      ]) as any;
+
+      console.log('Query finished. userData:', userData, 'fetchError:', fetchError);
+
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "Row not found"
+        console.error('Error fetching user:', fetchError);
+        throw new Error(`Database error: ${fetchError.message}`);
+      }
 
       if (userData) {
         // Existing user
         console.log('Existing user found:', userData.username);
+        console.log('Calling onLoginSuccess with userId:', userData.id, 'username:', userData.username);
         onLoginSuccess(userData.id, userData.username);
       } else {
         // New user - create profile
         console.log('Creating new user profile...');
         const { data: userAuth } = await supabase.auth.getUser();
-        const username = userAuth.user?.email?.split('@')[0] || 'User';
 
-        const { data: newUser, error: insertError } = await supabase
-          .from('users')
-          .insert({
-            id: userId,
-            username,
-            elo: 1200,
-            avatar: '😊',
-            total_games: 0,
-            wins: 0,
-            losses: 0,
-          })
-          .select()
-          .single();
+        // Extract username from Google account data
+        const userMetadata = userAuth.user?.user_metadata;
+        const username =
+          userMetadata?.full_name ||
+          userMetadata?.name ||
+          userAuth.user?.email?.split('@')[0] ||
+          'User';
+
+        console.log('Inserting new user:', username);
+        console.log('User metadata:', userMetadata);
+
+        const insertPromise = (async () => {
+          console.log('Starting user insert...');
+          const result = await supabase
+            .from('users')
+            .insert({
+              id: userId,
+              username,
+              elo: 1200,
+              avatar: '😊',
+              total_games: 0,
+              wins: 0,
+              losses: 0,
+            })
+            .select()
+            .single();
+
+          console.log('Insert completed. Result:', result);
+          return result;
+        })();
+
+        const { data: newUser, error: insertError } = await Promise.race([
+          insertPromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('User creation timeout')), 30000)
+          )
+        ]) as any;
 
         if (insertError) {
+          // Handle duplicate key error (race condition where user was created by another process)
+          if (insertError.code === '23505') {
+            console.log('User already created (race condition), fetching profile...');
+            const { data: existingUser } = await supabase
+              .from('users')
+              .select('id, username')
+              .eq('id', userId)
+              .single();
+
+            if (existingUser) {
+              onLoginSuccess(existingUser.id, existingUser.username);
+              isAuthInProgress.current = false;
+              return;
+            }
+          }
+
           console.error('Error creating user:', insertError);
-          Alert.alert('Error', 'Failed to create user profile');
-          return;
+          throw new Error(`Failed to create profile: ${insertError.message}`);
         }
 
         if (newUser) {
@@ -166,8 +279,25 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           onLoginSuccess(newUser.id, newUser.username);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error handling auth:', error);
+      Alert.alert(
+        'Login Error',
+        error.message || 'Authentication failed. Please check your internet connection and try again.',
+        [
+          { text: 'Retry', onPress: () => {
+            isAuthInProgress.current = false;
+            setVerifying(false);
+            checkExistingSession();
+          }},
+          { text: 'Cancel', onPress: () => {
+            isAuthInProgress.current = false;
+            setVerifying(false);
+          }}
+        ]
+      );
+    } finally {
+      isAuthInProgress.current = false;
     }
   };
 
@@ -182,6 +312,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
       console.log('Starting OAuth with redirect:', redirectUrl);
       console.log('IMPORTANT: Ensure this URL is added to your Supabase Redirect URLs!');
+
+      console.log('Supabase Auth URL:', redirectUrl); // Log the redirect URL we are using
 
       // Sign in with Google using Supabase OAuth
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -198,6 +330,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         setLoading(false);
         return;
       }
+
+      console.log('Supabase Auth URL generated:', data.url);
 
       // Open browser for OAuth
       if (data.url) {
@@ -241,6 +375,20 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <Text style={styles.descriptionText}>
             Confirming your login
           </Text>
+
+          <TouchableOpacity
+            style={{ marginTop: 20, padding: 10, backgroundColor: COLORS.white, borderRadius: 8 }}
+            onPress={() => checkExistingSession()}
+          >
+            <Text style={{ color: COLORS.primary, fontWeight: 'bold' }}>Check Status</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ marginTop: 10, padding: 10 }}
+            onPress={() => setVerifying(false)}
+          >
+            <Text style={{ color: COLORS.textSecondary }}>Cancel</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -292,12 +440,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <TouchableOpacity
               style={{ marginTop: 8, padding: 4, backgroundColor: '#ddd', borderRadius: 4, alignSelf: 'flex-start' }}
               onPress={() => {
-                const url = Linking.createURL('/auth');
                 Alert.alert('Copied!', 'URL copied to clipboard. Send this to your computer to add to Supabase.');
-                // Note: Clipboard requires expo-clipboard, but we can just ask user to select text for now if not installed.
-                // Since we didn't check for expo-clipboard, we'll rely on 'selectable' prop above, 
-                // but this button gives a visual cue. 
-                // Actually, let's just stick to selectable text to avoid adding dependencies.
               }}
             >
               <Text style={{ fontSize: 10 }}>Tap text above to copy</Text>
