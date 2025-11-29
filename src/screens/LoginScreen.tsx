@@ -7,9 +7,11 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  Platform,
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 
@@ -24,6 +26,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  // Ref to track if auth is in progress to prevent race conditions
+  // Moved to top level so it's accessible by all functions
+  const isAuthInProgress = React.useRef(false);
+
   // Handle deep linking for OAuth callback
   const handleUrl = async (event: { url: string }) => {
     console.log('Deep link received:', event.url);
@@ -31,10 +37,9 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     // Check if this is an OAuth callback
     if (event.url.includes('#access_token=') || event.url.includes('?access_token=')) {
       setVerifying(true);
-      setLoading(false); // Stop loading spinner
+      setLoading(false);
 
       try {
-        // Parse URL to extract tokens
         const url = event.url;
         const hashPart = url.split('#')[1];
         const queryPart = url.split('?')[1];
@@ -53,7 +58,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         if (accessToken) {
           console.log('Access token found, setting session...');
-          // Set session with the tokens
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken || '',
@@ -62,29 +66,34 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           if (error) {
             console.error('Session error:', error);
             Alert.alert('Authentication Failed', error.message);
+            setVerifying(false);
           } else if (data.user) {
             console.log('Session set successfully for user:', data.user.id);
+            // handleSuccessfulAuth will handle the rest
             await handleSuccessfulAuth(data.user.id);
           } else {
             console.log('Session set but no user data returned');
+            setVerifying(false);
           }
         } else {
           console.log('No access token found in URL');
+          setVerifying(false);
         }
       } catch (error: any) {
         console.error('Error parsing OAuth callback:', error);
         Alert.alert('Authentication Failed', error.message);
-      } finally {
-        console.log('Setting verifying to false');
-        // We don't set verifying to false here immediately because we might be waiting for handleSuccessfulAuth
-        // But if we failed, we should probably let the user try again.
-        // For now, let's leave it true if successful to show loading, or false if error.
-        // Actually, handleSuccessfulAuth handles the success case navigation.
+        setVerifying(false);
       }
     }
   };
 
   const checkExistingSession = async () => {
+    // Don't check if auth is already in progress
+    if (isAuthInProgress.current) {
+      console.log('checkExistingSession skipped - auth already in progress');
+      return;
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -114,7 +123,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       async (event, session) => {
         console.log('Auth event:', event, session?.user?.id);
 
-        if (event === 'SIGNED_IN' && session?.user) {
+        // Only handle SIGNED_IN if auth is not already in progress
+        if (event === 'SIGNED_IN' && session?.user && !isAuthInProgress.current) {
           console.log('SIGNED_IN event received, handling auth...');
           await handleSuccessfulAuth(session.user.id);
         }
@@ -122,7 +132,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     );
 
     // Subscribe to URL events
-    const urlSubscription = Linking.addEventListener('url', (event) => {
+    const urlSubscription = Linking.addEventListener('url', (event: { url: string }) => {
       console.log('Linking event received:', event.url);
       handleUrl(event);
     });
@@ -146,32 +156,30 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     };
   }, []);
 
-  // Ref to track if auth is in progress to prevent race conditions
-  const isAuthInProgress = React.useRef(false);
-
   const handleSuccessfulAuth = async (userId: string) => {
+    // Check if already in progress
     if (isAuthInProgress.current) {
       console.log('Auth already in progress for:', userId, 'skipping...');
       return;
     }
 
+    // Set flag immediately
     isAuthInProgress.current = true;
+    setVerifying(true);
     console.log('handleSuccessfulAuth called for:', userId);
 
     try {
-      // Check if user exists in database with timeout
       console.log('Checking if user exists in DB...');
       console.log('Supabase URL:', process.env.EXPO_PUBLIC_SUPABASE_URL);
 
-      // Create a promise that will timeout after 30 seconds
+      // Increased timeout to 60 seconds as requested
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Database query timeout - please check your internet connection')), 30000)
+        setTimeout(() => reject(new Error('Database query timeout - please check your internet connection')), 3000)
       );
 
       const dbQueryPromise = (async () => {
         console.log('Starting DB query for userId:', userId);
 
-        // First verify the session is properly set
         const { data: { session } } = await supabase.auth.getSession();
         console.log('Current session user:', session?.user?.id);
         console.log('Session access token exists:', !!session?.access_token);
@@ -180,16 +188,17 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           throw new Error('No active session found');
         }
 
-        // Add a small delay to ensure session propagation
+        // Small delay for session propagation
         await new Promise(resolve => setTimeout(resolve, 500));
 
+        const startTime = Date.now();
         const result = await supabase
           .from('users')
           .select('id, username')
           .eq('id', userId)
           .single();
 
-        console.log('DB query completed. Result:', result);
+        console.log(`DB query completed in ${Date.now() - startTime}ms`);
         return result;
       })();
 
@@ -200,22 +209,29 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
       console.log('Query finished. userData:', userData, 'fetchError:', fetchError);
 
-      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "Row not found"
+      if (fetchError && fetchError.code !== 'PGRST116') {
         console.error('Error fetching user:', fetchError);
         throw new Error(`Database error: ${fetchError.message}`);
       }
 
       if (userData) {
-        // Existing user
+        // Existing user - call onLoginSuccess and DON'T reset isAuthInProgress
+        // The component will unmount/navigate away, so we don't need to reset it
         console.log('Existing user found:', userData.username);
         console.log('Calling onLoginSuccess with userId:', userData.id, 'username:', userData.username);
+
+        // Save user data to AsyncStorage for auto-login
+        await AsyncStorage.setItem('userId', userData.id);
+        await AsyncStorage.setItem('username', userData.username);
+
         onLoginSuccess(userData.id, userData.username);
+        // Don't reset isAuthInProgress - prevents any other handlers from firing
+        return;
       } else {
         // New user - create profile
         console.log('Creating new user profile...');
         const { data: userAuth } = await supabase.auth.getUser();
 
-        // Extract username from Google account data
         const userMetadata = userAuth.user?.user_metadata;
         const username =
           userMetadata?.full_name ||
@@ -249,12 +265,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         const { data: newUser, error: insertError } = await Promise.race([
           insertPromise,
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('User creation timeout')), 30000)
+            setTimeout(() => reject(new Error('User creation timeout')), 60000)
           )
         ]) as any;
 
         if (insertError) {
-          // Handle duplicate key error (race condition where user was created by another process)
           if (insertError.code === '23505') {
             console.log('User already created (race condition), fetching profile...');
             const { data: existingUser } = await supabase
@@ -264,9 +279,12 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               .single();
 
             if (existingUser) {
+              // Save user data to AsyncStorage
+              await AsyncStorage.setItem('userId', existingUser.id);
+              await AsyncStorage.setItem('username', existingUser.username);
+
               onLoginSuccess(existingUser.id, existingUser.username);
-              isAuthInProgress.current = false;
-              return;
+              return; // Don't reset isAuthInProgress
             }
           }
 
@@ -276,51 +294,51 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         if (newUser) {
           console.log('New user created:', newUser.username);
+
+          // Save user data to AsyncStorage
+          await AsyncStorage.setItem('userId', newUser.id);
+          await AsyncStorage.setItem('username', newUser.username);
+
           onLoginSuccess(newUser.id, newUser.username);
+          return; // Don't reset isAuthInProgress
         }
       }
     } catch (error: any) {
       console.error('Error handling auth:', error);
+      // ONLY reset isAuthInProgress on error so user can retry
+      isAuthInProgress.current = false;
+      setVerifying(false);
+
       Alert.alert(
         'Login Error',
         error.message || 'Authentication failed. Please check your internet connection and try again.',
         [
-          { text: 'Retry', onPress: () => {
-            isAuthInProgress.current = false;
-            setVerifying(false);
-            checkExistingSession();
-          }},
-          { text: 'Cancel', onPress: () => {
-            isAuthInProgress.current = false;
-            setVerifying(false);
-          }}
+          {
+            text: 'Retry', onPress: () => {
+              checkExistingSession();
+            }
+          },
+          { text: 'Cancel', style: 'cancel' }
         ]
       );
-    } finally {
-      isAuthInProgress.current = false;
     }
+    // No finally block - we only reset on error
   };
 
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
 
-      // Use the scheme from app.json directly for OAuth callback
-      // This ensures we don't get localhost URLs in development
-      // Create redirect URL based on the current environment (Expo Go vs Standalone)
       const redirectUrl = Linking.createURL('/auth');
 
       console.log('Starting OAuth with redirect:', redirectUrl);
       console.log('IMPORTANT: Ensure this URL is added to your Supabase Redirect URLs!');
 
-      console.log('Supabase Auth URL:', redirectUrl); // Log the redirect URL we are using
-
-      // Sign in with Google using Supabase OAuth
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
+          skipBrowserRedirect: Platform.OS === 'web' ? false : true,
         },
       });
 
@@ -333,7 +351,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
       console.log('Supabase Auth URL generated:', data.url);
 
-      // Open browser for OAuth
       if (data.url) {
         console.log('Opening OAuth URL in browser...');
         console.log('Waiting for redirect to:', redirectUrl);
@@ -378,14 +395,21 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
           <TouchableOpacity
             style={{ marginTop: 20, padding: 10, backgroundColor: COLORS.white, borderRadius: 8 }}
-            onPress={() => checkExistingSession()}
+            onPress={() => {
+              // Reset the flag so we can retry
+              isAuthInProgress.current = false;
+              checkExistingSession();
+            }}
           >
             <Text style={{ color: COLORS.primary, fontWeight: 'bold' }}>Check Status</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={{ marginTop: 10, padding: 10 }}
-            onPress={() => setVerifying(false)}
+            onPress={() => {
+              isAuthInProgress.current = false;
+              setVerifying(false);
+            }}
           >
             <Text style={{ color: COLORS.textSecondary }}>Cancel</Text>
           </TouchableOpacity>

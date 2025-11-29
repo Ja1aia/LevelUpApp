@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from './src/screens/LoginScreen';
 import LobbyScreen from './src/screens/LobbyScreen';
 import WaitingForPlayerScreen from './src/screens/WaitingForPlayerScreen';
@@ -14,6 +15,7 @@ import MatchDetailsScreen from './src/screens/MatchDetailsScreen';
 import { Answer } from './src/types';
 import { QUESTIONS, TOTAL_QUESTIONS } from './src/utils/questions';
 import { supabase } from './src/lib/supabase';
+import { COLORS } from './src/theme/colors';
 
 type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails';
 
@@ -25,6 +27,65 @@ export default function App() {
   const [roomCode, setRoomCode] = useState('');
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState('');
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Check for existing session on app start
+  useEffect(() => {
+    checkExistingSession();
+  }, []);
+
+  const checkExistingSession = async () => {
+    try {
+      console.log('App: Checking for existing session...');
+
+      // First try to get stored user data from AsyncStorage (offline-first)
+      const storedUserId = await AsyncStorage.getItem('userId');
+      const storedUsername = await AsyncStorage.getItem('username');
+
+      if (storedUserId && storedUsername) {
+        console.log('App: Found stored credentials, checking session...');
+
+        try {
+          // Check Supabase session with timeout
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Session check timeout')), 5000)
+          );
+
+          const sessionPromise = supabase.auth.getSession();
+
+          const { data: { session } } = await Promise.race([
+            sessionPromise,
+            timeoutPromise
+          ]) as any;
+
+          if (session?.user) {
+            // Valid session + stored data = auto-login
+            console.log('App: Auto-login with valid session:', storedUsername);
+            setUserId(storedUserId);
+            setUsername(storedUsername);
+            setCurrentScreen('lobby');
+          } else {
+            // No session but have stored data - clear it
+            console.log('App: Session expired, clearing stored data');
+            await AsyncStorage.removeItem('userId');
+            await AsyncStorage.removeItem('username');
+          }
+        } catch (error) {
+          // Network error or timeout - use stored data anyway for offline experience
+          console.log('App: Network error, using cached credentials for offline mode');
+          setUserId(storedUserId);
+          setUsername(storedUsername);
+          setCurrentScreen('lobby');
+        }
+      } else {
+        console.log('App: No stored credentials found');
+      }
+    } catch (error) {
+      console.error('App: Error checking session:', error);
+    } finally {
+      setIsCheckingAuth(false);
+    }
+  };
 
   const handleStartQuiz = async (id: string, name: string) => {
     console.log('handleStartQuiz - userId:', id, 'username:', name);
@@ -73,14 +134,36 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      // Sign out from Supabase
       await supabase.auth.signOut();
+
+      // Clear AsyncStorage
+      await AsyncStorage.removeItem('userId');
+      await AsyncStorage.removeItem('username');
+
+      // Reset state
       setUsername('');
       setUserId('');
       setCurrentScreen('home');
+
+      console.log('App: Logged out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
+
+  // Show loading screen while checking auth
+  if (isCheckingAuth) {
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
@@ -178,5 +261,11 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.primaryLight,
   },
 });
