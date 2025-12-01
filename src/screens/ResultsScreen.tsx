@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { Answer, Question } from '../types';
-import { TOTAL_QUESTIONS } from '../utils/questions';
 import { supabase } from '../lib/supabase';
 
 interface ResultsScreenProps {
@@ -44,12 +43,12 @@ export default function ResultsScreen({
 
   const correctCount = answers.filter((a) => a.isCorrect).length;
   const wrongCount = answers.length - correctCount;
-  const percentage = Math.round((correctCount / TOTAL_QUESTIONS) * 100);
+  const percentage = Math.round((correctCount / questions.length) * 100);
   const averageTime =
     answers.reduce((sum, a) => sum + a.timeSpent, 0) / answers.length;
 
   const opponentScore = opponentAnswers.filter((a) => a.isCorrect).length;
-  const opponentPercentage = Math.round((opponentScore / TOTAL_QUESTIONS) * 100);
+  const opponentPercentage = Math.round((opponentScore / questions.length) * 100);
 
   // Determine winner
   const isWinner = correctCount > opponentScore;
@@ -255,7 +254,7 @@ export default function ResultsScreen({
 
           <View style={styles.playerScore}>
             <Text style={styles.scoreNumber}>{correctCount}</Text>
-            <Text style={styles.scoreTotal}>/{TOTAL_QUESTIONS}</Text>
+            <Text style={styles.scoreTotal}>/{questions.length}</Text>
           </View>
 
           <View style={styles.playerStats}>
@@ -270,8 +269,8 @@ export default function ResultsScreen({
                   yourEloChange > 0
                     ? styles.eloPositive
                     : yourEloChange < 0
-                    ? styles.eloNegative
-                    : styles.eloNeutral,
+                      ? styles.eloNegative
+                      : styles.eloNeutral,
                 ]}
               >
                 {yourEloChange > 0 ? '+' : ''}
@@ -295,7 +294,7 @@ export default function ResultsScreen({
 
           <View style={styles.playerScore}>
             <Text style={styles.scoreNumber}>{opponentScore}</Text>
-            <Text style={styles.scoreTotal}>/{TOTAL_QUESTIONS}</Text>
+            <Text style={styles.scoreTotal}>/{questions.length}</Text>
           </View>
 
           <View style={styles.playerStats}>
@@ -310,8 +309,8 @@ export default function ResultsScreen({
                   opponentEloChange > 0
                     ? styles.eloPositive
                     : opponentEloChange < 0
-                    ? styles.eloNegative
-                    : styles.eloNeutral,
+                      ? styles.eloNegative
+                      : styles.eloNeutral,
                 ]}
               >
                 {opponentEloChange > 0 ? '+' : ''}
@@ -320,6 +319,27 @@ export default function ResultsScreen({
             </View>
           </View>
         </View>
+      </View>
+
+      {/* Topic Performance */}
+      <View style={styles.breakdownContainer}>
+        <Text style={styles.breakdownTitle}>Topic Performance</Text>
+        {Object.entries(
+          questions.reduce((acc, q, idx) => {
+            const topic = q.topic || 'General';
+            if (!acc[topic]) acc[topic] = { correct: 0, total: 0 };
+            acc[topic].total++;
+            if (answers[idx]?.isCorrect) acc[topic].correct++;
+            return acc;
+          }, {} as Record<string, { correct: number; total: number }>)
+        ).map(([topic, stats], index) => (
+          <View key={index} style={styles.topicStatRow}>
+            <Text style={styles.topicStatName}>{topic}</Text>
+            <Text style={styles.topicStatValue}>
+              {stats.correct}/{stats.total} ({Math.round((stats.correct / stats.total) * 100)}%)
+            </Text>
+          </View>
+        ))}
       </View>
 
       {/* Answer Breakdown */}
@@ -415,7 +435,7 @@ export default function ResultsScreen({
       >
         <Text style={styles.playAgainText}>PLAY AGAIN</Text>
       </TouchableOpacity>
-      
+
     </ScrollView>
   );
 }
@@ -731,5 +751,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textSecondary,
     textAlign: 'center',
+  },
+  topicStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  topicStatName: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+  },
+  topicStatValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.primary,
   },
 });

@@ -12,8 +12,7 @@ import ResultsScreen from './src/screens/ResultsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import MatchHistoryScreen from './src/screens/MatchHistoryScreen';
 import MatchDetailsScreen from './src/screens/MatchDetailsScreen';
-import { Answer } from './src/types';
-import { QUESTIONS, TOTAL_QUESTIONS } from './src/utils/questions';
+import { Answer, Question } from './src/types';
 import { supabase } from './src/lib/supabase';
 import { COLORS } from './src/theme/colors';
 
@@ -23,9 +22,11 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
+  const [userElo, setUserElo] = useState<number>(1000);
   const [roomId, setRoomId] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState('');
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
@@ -33,6 +34,23 @@ export default function App() {
   useEffect(() => {
     checkExistingSession();
   }, []);
+
+  // Fetch user ELO from database
+  const fetchUserElo = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('elo')
+        .eq('id', id)
+        .single();
+
+      if (!error && data) {
+        setUserElo(data.elo || 1000);
+      }
+    } catch (error) {
+      console.error('Error fetching user ELO:', error);
+    }
+  };
 
   const checkExistingSession = async () => {
     try {
@@ -63,6 +81,7 @@ export default function App() {
             console.log('App: Auto-login with valid session:', storedUsername);
             setUserId(storedUserId);
             setUsername(storedUsername);
+            await fetchUserElo(storedUserId);
             setCurrentScreen('lobby');
           } else {
             // No session but have stored data - clear it
@@ -75,6 +94,7 @@ export default function App() {
           console.log('App: Network error, using cached credentials for offline mode');
           setUserId(storedUserId);
           setUsername(storedUsername);
+          await fetchUserElo(storedUserId);
           setCurrentScreen('lobby');
         }
       } else {
@@ -91,6 +111,7 @@ export default function App() {
     console.log('handleStartQuiz - userId:', id, 'username:', name);
     setUsername(name);
     setUserId(id);
+    await fetchUserElo(id);
     setCurrentScreen('lobby');
   };
 
@@ -116,8 +137,9 @@ export default function App() {
     setCurrentScreen('lobby'); // Go back to lobby
   };
 
-  const handleQuizComplete = (quizAnswers: Answer[]) => {
+  const handleQuizComplete = (quizAnswers: Answer[], quizQuestions: Question[]) => {
     setAnswers(quizAnswers);
+    setQuestions(quizQuestions);
     setCurrentScreen('waitingForOpponent'); // Wait for opponent to finish
   };
 
@@ -127,6 +149,7 @@ export default function App() {
 
   const handlePlayAgain = () => {
     setAnswers([]);
+    setQuestions([]);
     setRoomId('');
     setRoomCode('');
     setCurrentScreen('lobby'); // Back to lobby for new game
@@ -178,6 +201,7 @@ export default function App() {
           <LobbyScreen
             username={username}
             userId={userId}
+            userElo={userElo}
             onRoomCreated={handleRoomCreated}
             onRoomJoined={handleRoomJoined}
             onViewProfile={() => setCurrentScreen('profile')}
@@ -227,7 +251,6 @@ export default function App() {
             username={username}
             userId={userId}
             roomId={roomId}
-            questions={QUESTIONS}
             onQuizComplete={handleQuizComplete}
           />
         )}
@@ -238,7 +261,7 @@ export default function App() {
             userId={userId}
             roomId={roomId}
             yourScore={answers.filter((a) => a.isCorrect).length}
-            totalQuestions={TOTAL_QUESTIONS}
+            totalQuestions={questions.length}
             onOpponentFinished={handleOpponentFinished}
           />
         )}
@@ -249,7 +272,7 @@ export default function App() {
             userId={userId}
             roomId={roomId}
             answers={answers}
-            questions={QUESTIONS}
+            questions={questions}
             onPlayAgain={handlePlayAgain}
           />
         )}

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { supabase } from '../lib/supabase';
@@ -19,6 +20,12 @@ interface UserProfile {
   losses: number;
 }
 
+interface TopicStat {
+  topic: string;
+  total_correct: number;
+  total_answered: number;
+}
+
 interface ProfileScreenProps {
   userId: string;
   onBack?: () => void;
@@ -26,6 +33,7 @@ interface ProfileScreenProps {
 
 export default function ProfileScreen({ userId, onBack }: ProfileScreenProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [topicStats, setTopicStats] = useState<TopicStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +46,7 @@ export default function ProfileScreen({ userId, onBack }: ProfileScreenProps) {
       setLoading(true);
       setError(null);
 
+      // Fetch user profile
       const { data, error: fetchError } = await supabase
         .from('users')
         .select('id, username, elo, avatar, total_games, wins, losses')
@@ -53,6 +62,19 @@ export default function ProfileScreen({ userId, onBack }: ProfileScreenProps) {
       if (data) {
         setProfile(data);
       }
+
+      // Fetch topic stats
+      const { data: statsData, error: statsError } = await supabase
+        .from('user_topic_stats')
+        .select('topic, total_correct, total_answered')
+        .eq('user_id', userId)
+        .order('topic', { ascending: true });
+
+      if (statsError) {
+        console.error('Error fetching topic stats:', statsError);
+      } else if (statsData) {
+        setTopicStats(statsData);
+      }
     } catch (err) {
       console.error('Unexpected error fetching profile:', err);
       setError('Something went wrong');
@@ -67,6 +89,30 @@ export default function ProfileScreen({ userId, onBack }: ProfileScreenProps) {
     }
     const winRate = (profile.wins / profile.total_games) * 100;
     return winRate.toFixed(1);
+  };
+
+  const getRank = (correct: number, total: number): string => {
+    if (total === 0) return 'Unranked';
+    const percentage = (correct / total) * 100;
+
+    if (percentage >= 90) return 'S';
+    if (percentage >= 80) return 'A';
+    if (percentage >= 70) return 'B';
+    if (percentage >= 60) return 'C';
+    if (percentage >= 50) return 'D';
+    return 'F';
+  };
+
+  const getRankColor = (rank: string): string => {
+    switch (rank) {
+      case 'S': return '#FFD700'; // Gold
+      case 'A': return '#00D084'; // Green
+      case 'B': return '#4A90E2'; // Blue
+      case 'C': return '#F5A623'; // Orange
+      case 'D': return '#E86C60'; // Red
+      case 'F': return '#8B0000'; // Dark Red
+      default: return COLORS.textSecondary;
+    }
   };
 
   if (loading) {
@@ -95,68 +141,98 @@ export default function ProfileScreen({ userId, onBack }: ProfileScreenProps) {
 
   return (
     <View style={styles.container}>
-      {/* Header with back button */}
-      {onBack && (
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-      )}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header with back button */}
+        {onBack && (
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Profile</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+        )}
 
-      {/* Profile Card */}
-      <View style={styles.profileCard}>
-        {/* Avatar */}
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatar}>{profile.avatar || '😊'}</Text>
-        </View>
-
-        {/* Username */}
-        <Text style={styles.username}>{profile.username}</Text>
-
-        {/* ELO Rating */}
-        <View style={styles.eloContainer}>
-          <Text style={styles.eloLabel}>ELO Rating</Text>
-          <Text style={styles.eloValue}>{profile.elo}</Text>
-        </View>
-      </View>
-
-      {/* Stats Card */}
-      <View style={styles.statsCard}>
-        <Text style={styles.statsTitle}>Statistics</Text>
-
-        <View style={styles.statsGrid}>
-          {/* Total Games */}
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{profile.total_games}</Text>
-            <Text style={styles.statLabel}>Total Games</Text>
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          {/* Avatar */}
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatar}>{profile.avatar || '😊'}</Text>
           </View>
 
-          {/* Wins */}
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, styles.winsValue]}>
-              {profile.wins}
-            </Text>
-            <Text style={styles.statLabel}>Wins</Text>
-          </View>
+          {/* Username */}
+          <Text style={styles.username}>{profile.username}</Text>
 
-          {/* Losses */}
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, styles.lossesValue]}>
-              {profile.losses}
-            </Text>
-            <Text style={styles.statLabel}>Losses</Text>
-          </View>
-
-          {/* Win Rate */}
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{calculateWinRate()}%</Text>
-            <Text style={styles.statLabel}>Win Rate</Text>
+          {/* ELO Rating */}
+          <View style={styles.eloContainer}>
+            <Text style={styles.eloLabel}>ELO Rating</Text>
+            <Text style={styles.eloValue}>{profile.elo}</Text>
           </View>
         </View>
-      </View>
+
+        {/* Stats Card */}
+        <View style={styles.statsCard}>
+          <Text style={styles.statsTitle}>Statistics</Text>
+
+          <View style={styles.statsGrid}>
+            {/* Total Games */}
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{profile.total_games}</Text>
+              <Text style={styles.statLabel}>Total Games</Text>
+            </View>
+
+            {/* Wins */}
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, styles.winsValue]}>
+                {profile.wins}
+              </Text>
+              <Text style={styles.statLabel}>Wins</Text>
+            </View>
+
+            {/* Losses */}
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, styles.lossesValue]}>
+                {profile.losses}
+              </Text>
+              <Text style={styles.statLabel}>Losses</Text>
+            </View>
+
+            {/* Win Rate */}
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{calculateWinRate()}%</Text>
+              <Text style={styles.statLabel}>Win Rate</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Topic Stats Card */}
+        <View style={[styles.statsCard, { marginTop: 16 }]}>
+          <Text style={styles.statsTitle}>Competency Stats</Text>
+          {topicStats.length === 0 ? (
+            <Text style={styles.noStatsText}>No competency data yet.</Text>
+          ) : (
+            topicStats.map((stat, index) => {
+              const rank = getRank(stat.total_correct, stat.total_answered);
+              return (
+                <View key={index} style={styles.topicRow}>
+                  <Text style={styles.topicName}>{stat.topic}</Text>
+                  <View style={styles.rankContainer}>
+                    <Text style={[styles.rankText, { color: getRankColor(rank) }]}>
+                      {rank}
+                    </Text>
+                    <Text style={styles.rankDetail}>
+                      ({stat.total_correct}/{stat.total_answered})
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -165,7 +241,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  scrollContent: {
     padding: 16,
+    paddingBottom: 32,
   },
   loadingContainer: {
     flex: 1,
@@ -319,5 +398,37 @@ const styles = StyleSheet.create({
   },
   lossesValue: {
     color: COLORS.error,
+  },
+  noStatsText: {
+    textAlign: 'center',
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 8,
+  },
+  topicRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  topicName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  rankContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rankText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginRight: 8,
+  },
+  rankDetail: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
   },
 });

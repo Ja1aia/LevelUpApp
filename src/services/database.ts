@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { Question } from '../types';
 
 /**
  * Database Service
@@ -89,6 +90,38 @@ export async function updateUserStats(
   }
 }
 
+// ==================== QUESTIONS ====================
+
+/**
+ * Get 5 questions based on user ELO
+ * Returns questions closest to user's ELO
+ */
+export async function getQuestionsByElo(userElo: number): Promise<Question[]> {
+  try {
+    // Use RPC to get questions sorted by ELO proximity on the server
+    const { data, error } = await supabase.rpc('get_questions_by_elo', {
+      user_elo: userElo,
+      limit_count: 5
+    });
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) return [];
+
+    // Map to Question type
+    return data.map((q: any) => ({
+      id: q.id,
+      question: q.question_text,
+      options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+      correctAnswer: q.correct_answer,
+      topic: q.topic
+    }));
+  } catch (error) {
+    console.error('getQuestionsByElo error:', error);
+    return [];
+  }
+}
+
 // ==================== ROOMS ====================
 
 /**
@@ -97,12 +130,26 @@ export async function updateUserStats(
  */
 export async function createRoom(hostId: string, roomCode: string) {
   try {
+    // 1. Get host ELO
+    const { data: host } = await supabase
+      .from('users')
+      .select('elo')
+      .eq('id', hostId)
+      .single();
+
+    const hostElo = host?.elo || 1200;
+
+    // 2. Get questions for this match
+    const questions = await getQuestionsByElo(hostElo);
+
+    // 3. Create room with questions
     const { data, error } = await supabase
       .from('rooms')
       .insert({
         room_code: roomCode,
         host_id: hostId,
         status: 'waiting',
+        questions: questions // Store the selected questions
       })
       .select()
       .single();
@@ -209,6 +256,51 @@ export async function updateRoomStatus(
   }
 }
 
+// ==================== STATS ====================
+
+/**
+ * Update user topic stats
+ */
+export async function updateTopicStats(
+  userId: string,
+  topic: string,
+  isCorrect: boolean
+) {
+  try {
+    // Check if stat exists
+    const { data: existing } = await supabase
+      .from('user_topic_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('topic', topic)
+      .single();
+
+    if (existing) {
+      // Update existing
+      await supabase
+        .from('user_topic_stats')
+        .update({
+          total_answered: existing.total_answered + 1,
+          total_correct: existing.total_correct + (isCorrect ? 1 : 0),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+    } else {
+      // Create new
+      await supabase
+        .from('user_topic_stats')
+        .insert({
+          user_id: userId,
+          topic,
+          total_answered: 1,
+          total_correct: isCorrect ? 1 : 0,
+        });
+    }
+  } catch (error) {
+    console.error('updateTopicStats error:', error);
+  }
+}
+
 // ==================== GAME SESSIONS ====================
 
 /**
@@ -227,7 +319,7 @@ export async function saveAnswer(
     // Get room to determine if player is player1 or player2
     const { data: room } = await supabase
       .from('rooms')
-      .select('host_id, guest_id')
+      .select('host_id, guest_id, questions')
       .eq('id', roomId)
       .single();
 
@@ -238,15 +330,15 @@ export async function saveAnswer(
     // Player-specific column updates
     const playerData = isPlayer1
       ? {
-          player1_answer: answer,
-          player1_time: timeSpent,
-          player1_correct: isCorrect,
-        }
+        player1_answer: answer,
+        player1_time: timeSpent,
+        player1_correct: isCorrect,
+      }
       : {
-          player2_answer: answer,
-          player2_time: timeSpent,
-          player2_correct: isCorrect,
-        };
+        player2_answer: answer,
+        player2_time: timeSpent,
+        player2_correct: isCorrect,
+      };
 
     // Try to insert first
     const { data: inserted, error: insertError } = await supabase
@@ -259,6 +351,21 @@ export async function saveAnswer(
       .select()
       .single();
 
+    // Update Topic Stats
+    // We need to find the topic of the question.
+    // The questions are stored in the room.
+    if (room.questions) {
+      const questions = typeof room.questions === 'string'
+        ? JSON.parse(room.questions)
+        : room.questions;
+
+      const question = questions[questionIndex];
+      if (question && question.topic) {
+        // Fire and forget - don't await to avoid blocking game flow
+        updateTopicStats(playerId, question.topic, isCorrect);
+      }
+    }
+
     // If insert succeeds, return
     if (!insertError) {
       console.log('✅ Answer inserted successfully');
@@ -266,9 +373,8 @@ export async function saveAnswer(
     }
 
     // If insert fails due to unique constraint, update instead
-    if (insertError.code === '23505') {
-      console.log('Record exists, updating instead...');
-
+    if (insertError.code === '23505') { // Unique violation
+      console.log('⚠️ Answer exists, updating...');
       const { data: updated, error: updateError } = await supabase
         .from('game_sessions')
         .update(playerData)
@@ -278,107 +384,17 @@ export async function saveAnswer(
         .single();
 
       if (updateError) {
-        console.error('Update failed:', updateError);
+        console.error('Error updating answer:', updateError);
         return { data: null, error: updateError };
       }
 
-      console.log('✅ Answer updated successfully');
       return { data: updated, error: null };
     }
 
-    // Other insert error
-    console.error('Insert failed:', insertError);
+    console.error('Error saving answer:', insertError);
     return { data: null, error: insertError };
   } catch (error) {
     console.error('saveAnswer error:', error);
-    return { data: null, error };
-  }
-}
-
-/**
- * Get all answers for a room
- */
-export async function getGameSessions(roomId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('game_sessions')
-      .select('*')
-      .eq('room_id', roomId)
-      .order('question_index', { ascending: true });
-
-    return { data, error };
-  } catch (error) {
-    console.error('getGameSessions error:', error);
-    return { data: null, error };
-  }
-}
-
-// ==================== GAME RESULTS ====================
-
-/**
- * Save final game result
- */
-export async function saveGameResult(
-  roomId: string,
-  player1Id: string,
-  player2Id: string,
-  player1Score: number,
-  player2Score: number,
-  player1EloChange: number,
-  player2EloChange: number
-) {
-  try {
-    const winnerId =
-      player1Score > player2Score
-        ? player1Id
-        : player2Score > player1Score
-        ? player2Id
-        : null; // Draw
-
-    const { data, error } = await supabase
-      .from('game_results')
-      .insert({
-        room_id: roomId,
-        winner_id: winnerId,
-        player1_id: player1Id,
-        player2_id: player2Id,
-        player1_score: player1Score,
-        player2_score: player2Score,
-        player1_elo_change: player1EloChange,
-        player2_elo_change: player2EloChange,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error saving game result:', error);
-      return { data: null, error };
-    }
-
-    // Update room status to finished
-    await updateRoomStatus(roomId, 'finished');
-
-    return { data, error: null };
-  } catch (error) {
-    console.error('saveGameResult error:', error);
-    return { data: null, error };
-  }
-}
-
-/**
- * Get game result by room ID
- */
-export async function getGameResult(roomId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('game_results')
-      .select('*')
-      .eq('room_id', roomId)
-      .single();
-
-    return { data, error };
-  } catch (error) {
-    console.error('getGameResult error:', error);
     return { data: null, error };
   }
 }

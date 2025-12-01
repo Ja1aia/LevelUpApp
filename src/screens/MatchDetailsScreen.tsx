@@ -125,14 +125,35 @@ export default function MatchDetailsScreen({
         };
       });
 
-      // Fetch questions from sessions
-      const questions: Question[] = sessions.map((session, index) => ({
-        id: index + 1,
-        question: session.question_text,
-        options: session.question_options,
-        correctAnswer: session.correct_answer,
-        topic: session.question_topic || 'General',
-      }));
+      // Fetch room to get the questions used
+      const { data: roomData, error: roomError } = await supabase
+        .from('rooms')
+        .select('questions')
+        .eq('id', gameResult.room_id)
+        .single();
+
+      if (roomError || !roomData) {
+        console.error('Error fetching room questions:', roomError);
+      }
+
+      // Parse questions from room
+      let questions: Question[] = [];
+      if (roomData?.questions) {
+        questions = typeof roomData.questions === 'string'
+          ? JSON.parse(roomData.questions)
+          : roomData.questions;
+      }
+
+      // If for some reason questions are missing in room (legacy), try to use what's in sessions or fallback
+      if (questions.length === 0 && sessions.length > 0) {
+        questions = sessions.map((session, index) => ({
+          id: index + 1,
+          question: session.question_text || 'Question not found',
+          options: session.question_options || [],
+          correctAnswer: session.correct_answer || 0,
+          topic: session.question_topic || 'General',
+        }));
+      }
 
       const yourScore = isPlayer1 ? gameResult.player1_score : gameResult.player2_score;
       const opponentScore = isPlayer1 ? gameResult.player2_score : gameResult.player1_score;
@@ -311,8 +332,8 @@ export default function MatchDetailsScreen({
                     matchDetails.yourEloChange > 0
                       ? styles.eloPositive
                       : matchDetails.yourEloChange < 0
-                      ? styles.eloNegative
-                      : styles.eloNeutral,
+                        ? styles.eloNegative
+                        : styles.eloNeutral,
                   ]}
                 >
                   {matchDetails.yourEloChange > 0 ? '+' : ''}
@@ -333,8 +354,8 @@ export default function MatchDetailsScreen({
             style={[
               styles.playerCard,
               !matchDetails.isWinner &&
-                !matchDetails.isDraw &&
-                styles.playerCardWinner,
+              !matchDetails.isDraw &&
+              styles.playerCardWinner,
             ]}
           >
             <View style={styles.playerHeader}>
@@ -361,8 +382,8 @@ export default function MatchDetailsScreen({
                     matchDetails.opponentEloChange > 0
                       ? styles.eloPositive
                       : matchDetails.opponentEloChange < 0
-                      ? styles.eloNegative
-                      : styles.eloNeutral,
+                        ? styles.eloNegative
+                        : styles.eloNeutral,
                   ]}
                 >
                   {matchDetails.opponentEloChange > 0 ? '+' : ''}

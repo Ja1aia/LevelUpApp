@@ -17,6 +17,7 @@ import { generateRoomCode, formatRoomCode, isValidRoomCode } from '../utils/room
 interface LobbyScreenProps {
   username: string;
   userId: string;
+  userElo: number;
   onRoomCreated: (roomId: string, roomCode: string) => void;
   onRoomJoined: (roomId: string, roomCode: string) => void;
   onViewProfile: () => void;
@@ -27,6 +28,7 @@ interface LobbyScreenProps {
 export default function LobbyScreen({
   username,
   userId,
+  userElo,
   onRoomCreated,
   onRoomJoined,
   onViewProfile,
@@ -181,12 +183,17 @@ export default function LobbyScreen({
           <Text style={styles.subtitle}>Choose your mode</Text>
         </View>
 
-        {/* User Info - Tap to view profile */}
+        {/* User Info Card - Tap to view profile */}
         <TouchableOpacity style={styles.userCard} onPress={onViewProfile} activeOpacity={0.7}>
-          <Text style={styles.userEmoji}>👤</Text>
+          <View style={styles.userAvatarCircle}>
+            <Text style={styles.userAvatarIcon}>👤</Text>
+          </View>
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{username}</Text>
             <Text style={styles.tapHint}>Tap to view profile</Text>
+          </View>
+          <View style={styles.eloChip}>
+            <Text style={styles.eloText}>{userElo} ELO</Text>
           </View>
         </TouchableOpacity>
 
@@ -199,7 +206,7 @@ export default function LobbyScreen({
             activeOpacity={0.8}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color="#1A1A1A" />
             ) : (
               <>
                 <Text style={styles.createButtonIcon}>🎮</Text>
@@ -223,7 +230,7 @@ export default function LobbyScreen({
           <TextInput
             style={[styles.input, error && styles.inputError]}
             placeholder="Enter Room Code (e.g., ABC123)"
-            placeholderTextColor="#999"
+            placeholderTextColor="#B0B0B0"
             value={roomCodeInput}
             onChangeText={(text) => {
               setRoomCodeInput(text.toUpperCase());
@@ -261,12 +268,12 @@ export default function LobbyScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FAFAFA',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 80,
+    paddingHorizontal: 20,
+    paddingTop: 70,
   },
   topBar: {
     position: 'absolute',
@@ -279,6 +286,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
+    backgroundColor: '#FAFAFA',
     zIndex: 100,
   },
   topBarSpacer: {
@@ -286,20 +294,16 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     padding: 10,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#FFFFFF',
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 3,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
   menuIcon: {
-    fontSize: 28,
+    fontSize: 24,
     color: '#1A1A1A',
     fontWeight: 'bold',
   },
@@ -309,12 +313,10 @@ const styles = StyleSheet.create({
     right: 16,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
     elevation: 5,
     minWidth: 200,
     overflow: 'hidden',
@@ -331,80 +333,109 @@ const styles = StyleSheet.create({
   },
   dropdownDivider: {
     height: 1,
-    backgroundColor: '#E5E5E5',
+    backgroundColor: '#F0F0F0',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 28,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#1A1A1A',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: '#666666',
+    fontWeight: '400',
   },
   userCard: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
+    marginBottom: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  userEmoji: {
-    fontSize: 28,
+  userAvatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E8F4FD',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
+  },
+  userAvatarIcon: {
+    fontSize: 24,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     color: '#1A1A1A',
+    marginBottom: 2,
   },
   tapHint: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 2,
+    fontSize: 13,
+    color: '#999999',
+  },
+  eloChip: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  eloText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
   },
   section: {
     marginBottom: 24,
   },
   createButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: 14,
+    paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   createButtonIcon: {
-    fontSize: 24,
-    marginRight: 12,
+    fontSize: 22,
+    marginRight: 10,
   },
   createButtonText: {
     color: '#1A1A1A',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   createHint: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#888888',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 10,
+    fontWeight: '400',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
+    marginVertical: 28,
   },
   dividerLine: {
     flex: 1,
@@ -413,72 +444,65 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     paddingHorizontal: 16,
-    fontSize: 14,
-    color: '#999',
+    fontSize: 13,
+    color: '#999999',
     fontWeight: '600',
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: '#2A2A2A',
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#F8F9FA',
-    borderWidth: 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
     borderColor: '#E5E5E5',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 18,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    fontSize: 16,
     color: '#1A1A1A',
     textAlign: 'center',
     fontWeight: '600',
     letterSpacing: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   inputError: {
     borderColor: '#FF4444',
   },
   errorText: {
     color: '#FF4444',
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 8,
     textAlign: 'center',
+    fontWeight: '500',
   },
   joinButton: {
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: COLORS.primary,
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   joinButtonText: {
     color: COLORS.primary,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   buttonDisabled: {
     opacity: 0.5,
-  },
-  infoCard: {
-    backgroundColor: '#FFF9E6',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#FFE5A3',
-    marginTop: 8,
-  },
-  infoIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
   },
 });

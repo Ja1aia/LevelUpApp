@@ -5,10 +5,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { Question, Answer } from '../types';
-import { TIMER_DURATION, TOTAL_QUESTIONS } from '../utils/questions';
+import { TIMER_DURATION } from '../utils/questions';
 import PlayerCard from '../components/PlayerCard';
 import { saveAnswer } from '../services/database';
 import { supabase } from '../lib/supabase';
@@ -17,17 +18,19 @@ interface QuizScreenProps {
   username: string;
   userId: string;
   roomId: string;
-  questions: Question[];
-  onQuizComplete: (answers: Answer[]) => void;
+  questions?: Question[];
+  onQuizComplete: (answers: Answer[], questions: Question[]) => void;
 }
 
 export default function QuizScreen({
   username,
   userId,
   roomId,
-  questions,
+  questions: initialQuestions,
   onQuizComplete,
 }: QuizScreenProps) {
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions || []);
+  const [loadingQuestions, setLoadingQuestions] = useState(!initialQuestions || initialQuestions.length === 0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(TIMER_DURATION);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -102,6 +105,41 @@ export default function QuizScreen({
 
     fetchPlayerData();
   }, [roomId, userId]);
+
+  // Fetch questions if not provided
+  useEffect(() => {
+    if (questions.length > 0) return;
+
+    const fetchQuestions = async () => {
+      try {
+        setLoadingQuestions(true);
+        const { data: room, error } = await supabase
+          .from('rooms')
+          .select('questions')
+          .eq('id', roomId)
+          .single();
+
+        if (error) throw error;
+
+        if (room?.questions) {
+          // Parse questions if they are stored as JSON string, or use directly if JSONB
+          const parsedQuestions = typeof room.questions === 'string'
+            ? JSON.parse(room.questions)
+            : room.questions;
+
+          setQuestions(parsedQuestions);
+        } else {
+          console.error('No questions found in room');
+        }
+      } catch (err) {
+        console.error('Error fetching questions:', err);
+      } finally {
+        setLoadingQuestions(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [roomId, questions.length]);
 
   // Real-time opponent subscription - setup once, not per question
   useEffect(() => {
@@ -310,7 +348,7 @@ export default function QuizScreen({
       setQuestionStartTime(Date.now());
     } else {
       // Quiz complete
-      onQuizComplete(newAnswers);
+      onQuizComplete(newAnswers, questions);
     }
   };
 
@@ -334,60 +372,74 @@ export default function QuizScreen({
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.questionNumber}>
-          Question {currentIndex + 1}/{TOTAL_QUESTIONS}
-        </Text>
-        <View style={styles.timerContainer}>
-          <Text style={styles.timer}>⏱️ {timeLeft}s</Text>
+      {loadingQuestions ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading questions...</Text>
         </View>
-      </View>
+      ) : (
+        <>
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.questionNumber}>
+                Question {currentIndex + 1}/{questions.length}
+              </Text>
+              {currentQuestion?.topic && (
+                <Text style={styles.topicText}>{currentQuestion.topic}</Text>
+              )}
+            </View>
+            <View style={styles.timerContainer}>
+              <Text style={styles.timer}>⏱️ {timeLeft}s</Text>
+            </View>
+          </View>
 
-      {/* Timer Progress Bar */}
-      <View style={styles.progressBarContainer}>
-        <View style={[styles.progressBar, { width: `${timerProgress}%` }]} />
-      </View>
+          {/* Timer Progress Bar */}
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBar, { width: `${timerProgress}%` }]} />
+          </View>
 
-      {/* Battle Mode: 2 Player Cards (Horizontal) */}
-      <View style={styles.playersContainer}>
-        <PlayerCard
-          username={username}
-          elo={userElo}
-          currentScore={answers.filter((a) => a.isCorrect).length}
-          totalQuestions={currentIndex}
-          isYou={true}
-          avatar="😊"
-        />
-        <PlayerCard
-          username={opponentUsername}
-          elo={opponentElo}
-          currentScore={opponentScore}
-          totalQuestions={currentIndex}
-          isYou={false}
-          avatar="🤖"
-        />
-      </View>
+          {/* Battle Mode: 2 Player Cards (Horizontal) */}
+          <View style={styles.playersContainer}>
+            <PlayerCard
+              username={username}
+              elo={userElo}
+              currentScore={answers.filter((a) => a.isCorrect).length}
+              totalQuestions={currentIndex}
+              isYou={true}
+              avatar="😊"
+            />
+            <PlayerCard
+              username={opponentUsername}
+              elo={opponentElo}
+              currentScore={opponentScore}
+              totalQuestions={currentIndex}
+              isYou={false}
+              avatar="🤖"
+            />
+          </View>
 
-      {/* Question */}
-      <View style={styles.questionCard}>
-        <Text style={styles.questionText}>{currentQuestion.question}</Text>
-      </View>
+          {/* Question */}
+          <View style={styles.questionCard}>
+            <Text style={styles.questionText}>{currentQuestion?.question}</Text>
+          </View>
 
-      {/* Options */}
-      <View style={styles.optionsContainer}>
-        {currentQuestion.options.map((option, index) => (
-          <TouchableOpacity
-            key={index}
-            style={getButtonStyle(index)}
-            onPress={() => handleAnswer(index)}
-            disabled={selectedAnswer !== null}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.optionText}>{option}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          {/* Options */}
+          <View style={styles.optionsContainer}>
+            {currentQuestion?.options.map((option, index) => (
+              <TouchableOpacity
+                key={index}
+                style={getButtonStyle(index)}
+                onPress={() => handleAnswer(index)}
+                disabled={selectedAnswer !== null}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.optionText}>{option}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -408,6 +460,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.textPrimary,
+  },
+  topicText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 2,
   },
   timerContainer: {
     backgroundColor: COLORS.white,
@@ -481,7 +538,7 @@ const styles = StyleSheet.create({
   optionButtonDisabled: {
     backgroundColor: COLORS.white,
     borderColor: COLORS.border,
-    opacity: 0.5,    
+    opacity: 0.5,
     borderRadius: 12,
     padding: 16,
     borderWidth: 2,
@@ -491,5 +548,15 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.textSecondary,
   },
 });
