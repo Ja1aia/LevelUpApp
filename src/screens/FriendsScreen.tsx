@@ -17,11 +17,20 @@ import {
     sendFriendRequest,
     acceptFriendRequest,
     removeFriend,
+    createRoom,
+    createGameInvite,
+    getGameInvites,
+    respondToGameInvite,
+    joinRoom,
 } from '../services/database';
+import { generateRoomCode } from '../utils/roomCode';
 
 interface FriendsScreenProps {
     userId: string;
+    username: string;
     onBack: () => void;
+    onRoomCreated: (roomId: string, roomCode: string) => void;
+    onRoomJoined: (roomId: string, roomCode: string) => void;
 }
 
 interface Friend {
@@ -44,14 +53,38 @@ interface FriendRequest {
     };
 }
 
-export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
-    const [activeTab, setActiveTab] = useState<'friends' | 'requests'>('friends');
+interface GameInvite {
+    id: string;
+    sender_id: string;
+    room_id: string;
+    created_at: string;
+    sender: {
+        id: string;
+        username: string;
+        elo: number;
+        avatar: string;
+    };
+    room: {
+        room_code: string;
+    };
+}
+
+export default function FriendsScreen({
+    userId,
+    username,
+    onBack,
+    onRoomCreated,
+    onRoomJoined
+}: FriendsScreenProps) {
+    const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'invites'>('friends');
     const [friends, setFriends] = useState<Friend[]>([]);
     const [requests, setRequests] = useState<FriendRequest[]>([]);
+    const [invites, setInvites] = useState<GameInvite[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [addUsername, setAddUsername] = useState('');
     const [addingFriend, setAddingFriend] = useState(false);
+    const [processingInvite, setProcessingInvite] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -59,13 +92,13 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
 
     const fetchData = async () => {
         setLoading(true);
-        await Promise.all([fetchFriends(), fetchRequests()]);
+        await Promise.all([fetchFriends(), fetchRequests(), fetchInvites()]);
         setLoading(false);
     };
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await Promise.all([fetchFriends(), fetchRequests()]);
+        await Promise.all([fetchFriends(), fetchRequests(), fetchInvites()]);
         setRefreshing(false);
     };
 
@@ -79,7 +112,6 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
     const fetchRequests = async () => {
         const { data, error } = await getFriendRequests(userId);
         if (!error && data) {
-            // Ensure data matches FriendRequest type
             const formattedRequests: FriendRequest[] = data.map((item: any) => ({
                 id: item.id,
                 user_id_1: item.user_id_1,
@@ -87,6 +119,21 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
                 sender: Array.isArray(item.sender) ? item.sender[0] : item.sender
             }));
             setRequests(formattedRequests);
+        }
+    };
+
+    const fetchInvites = async () => {
+        const { data, error } = await getGameInvites(userId);
+        if (!error && data) {
+            const formattedInvites: GameInvite[] = data.map((item: any) => ({
+                id: item.id,
+                sender_id: item.sender_id,
+                room_id: item.room_id,
+                created_at: item.created_at,
+                sender: Array.isArray(item.sender) ? item.sender[0] : item.sender,
+                room: Array.isArray(item.room) ? item.room[0] : item.room
+            }));
+            setInvites(formattedInvites);
         }
     };
 
@@ -123,10 +170,10 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
         }
     };
 
-    const handleRemoveFriend = (friendshipId: string, username: string) => {
+    const handleRemoveFriend = (friendshipId: string, friendUsername: string) => {
         Alert.alert(
             'Remove Friend',
-            `Are you sure you want to remove ${username}?`,
+            `Are you sure you want to remove ${friendUsername}?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -145,6 +192,65 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
         );
     };
 
+    const handleChallenge = async (friendId: string, friendName: string) => {
+        try {
+            setProcessingInvite(true);
+            // 1. Create Room
+            const roomCode = generateRoomCode();
+            const { data: room, error: roomError } = await createRoom(userId, roomCode);
+
+            if (roomError || !room) {
+                throw new Error('Failed to create room');
+            }
+
+            // 2. Create Invite
+            const { error: inviteError } = await createGameInvite(userId, friendId, room.id);
+
+            if (inviteError) {
+                throw new Error('Failed to send invite');
+            }
+
+            // 3. Navigate to waiting screen
+            onRoomCreated(room.id, roomCode);
+        } catch (error) {
+            console.error('Challenge error:', error);
+            Alert.alert('Error', 'Failed to send challenge');
+        } finally {
+            setProcessingInvite(false);
+        }
+    };
+
+    const handleAcceptInvite = async (invite: GameInvite) => {
+        try {
+            setProcessingInvite(true);
+            // 1. Join Room
+            const { data: room, error: joinError } = await joinRoom(invite.room.room_code, userId);
+
+            if (joinError || !room) {
+                Alert.alert('Error', 'Room is no longer available');
+                await respondToGameInvite(invite.id, 'expired');
+                fetchInvites();
+                return;
+            }
+
+            // 2. Update Invite Status
+            await respondToGameInvite(invite.id, 'accepted');
+
+            // 3. Navigate to quiz
+            onRoomJoined(room.id, invite.room.room_code);
+        } catch (error) {
+            console.error('Accept invite error:', error);
+            Alert.alert('Error', 'Failed to join game');
+        } finally {
+            setProcessingInvite(false);
+        }
+    };
+
+    const handleRejectInvite = async (inviteId: string) => {
+        await respondToGameInvite(inviteId, 'rejected');
+        fetchInvites();
+    };
+
     const renderFriendItem = ({ item }: { item: Friend }) => (
         <View style={styles.card}>
             <View style={styles.avatarContainer}>
@@ -154,12 +260,21 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
                 <Text style={styles.username}>{item.username}</Text>
                 <Text style={styles.elo}>{item.elo} ELO</Text>
             </View>
-            <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => handleRemoveFriend(item.friendshipId, item.username)}
-            >
-                <Text style={styles.removeButtonText}>Remove</Text>
-            </TouchableOpacity>
+            <View style={styles.actionButtons}>
+                <TouchableOpacity
+                    style={styles.challengeButton}
+                    onPress={() => handleChallenge(item.id, item.username)}
+                    disabled={processingInvite}
+                >
+                    <Text style={styles.challengeButtonText}>⚔️</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveFriend(item.friendshipId, item.username)}
+                >
+                    <Text style={styles.removeButtonText}>🗑️</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 
@@ -184,6 +299,34 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
                     onPress={() => handleReject(item.id)}
                 >
                     <Text style={styles.rejectButtonText}>Reject</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
+    const renderInviteItem = ({ item }: { item: GameInvite }) => (
+        <View style={styles.card}>
+            <View style={styles.avatarContainer}>
+                <Text style={styles.avatarText}>{item.sender.avatar}</Text>
+            </View>
+            <View style={styles.infoContainer}>
+                <Text style={styles.username}>{item.sender.username}</Text>
+                <Text style={styles.elo}>Challenged you!</Text>
+            </View>
+            <View style={styles.actionButtons}>
+                <TouchableOpacity
+                    style={styles.acceptButton}
+                    onPress={() => handleAcceptInvite(item)}
+                    disabled={processingInvite}
+                >
+                    <Text style={styles.acceptButtonText}>Battle!</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.rejectButton}
+                    onPress={() => handleRejectInvite(item.id)}
+                    disabled={processingInvite}
+                >
+                    <Text style={styles.rejectButtonText}>Decline</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -229,7 +372,7 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
                     onPress={() => setActiveTab('friends')}
                 >
                     <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
-                        My Friends ({friends.length})
+                        Friends ({friends.length})
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -238,6 +381,14 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
                 >
                     <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
                         Requests ({requests.length})
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'invites' && styles.activeTab]}
+                    onPress={() => setActiveTab('invites')}
+                >
+                    <Text style={[styles.tabText, activeTab === 'invites' && styles.activeTabText]}>
+                        Invites ({invites.length})
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -249,15 +400,21 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
                 </View>
             ) : (
                 <FlatList
-                    data={(activeTab === 'friends' ? friends : requests) as any[]}
+                    data={
+                        activeTab === 'friends' ? friends :
+                            activeTab === 'requests' ? requests :
+                                invites as any[]
+                    }
                     renderItem={({ item }) => {
                         if (activeTab === 'friends') {
                             return renderFriendItem({ item: item as Friend });
-                        } else {
+                        } else if (activeTab === 'requests') {
                             return renderRequestItem({ item: item as FriendRequest });
+                        } else {
+                            return renderInviteItem({ item: item as GameInvite });
                         }
                     }}
-                    keyExtractor={(item) => (activeTab === 'friends' ? (item as Friend).friendshipId : (item as FriendRequest).id)}
+                    keyExtractor={(item) => item.id || (item as Friend).friendshipId}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -265,7 +422,9 @@ export default function FriendsScreen({ userId, onBack }: FriendsScreenProps) {
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <Text style={styles.emptyText}>
-                                {activeTab === 'friends' ? 'No friends yet' : 'No pending requests'}
+                                {activeTab === 'friends' ? 'No friends yet' :
+                                    activeTab === 'requests' ? 'No pending requests' :
+                                        'No game invites'}
                             </Text>
                         </View>
                     }
@@ -356,7 +515,7 @@ const styles = StyleSheet.create({
         borderBottomColor: COLORS.primary,
     },
     tabText: {
-        fontSize: 16,
+        fontSize: 14,
         color: '#888',
         fontWeight: '600',
     },
@@ -403,17 +562,31 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#888',
     },
-    removeButton: {
-        padding: 8,
-    },
-    removeButtonText: {
-        color: '#FF4444',
-        fontSize: 14,
-        fontWeight: '600',
-    },
     actionButtons: {
         flexDirection: 'row',
         gap: 8,
+        alignItems: 'center',
+    },
+    challengeButton: {
+        backgroundColor: '#F0F0F0',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    challengeButtonText: {
+        fontSize: 20,
+    },
+    removeButton: {
+        padding: 8,
+        backgroundColor: '#F0F0F0',
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    removeButtonText: {
+        fontSize: 20,
     },
     acceptButton: {
         backgroundColor: COLORS.primary,

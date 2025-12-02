@@ -305,7 +305,10 @@ export default function App() {
         {currentScreen === 'friends' && (
           <FriendsScreen
             userId={userId}
+            username={username}
             onBack={() => setCurrentScreen('lobby')}
+            onRoomCreated={handleRoomCreated}
+            onRoomJoined={handleRoomJoined}
           />
         )}
       </SafeAreaView>

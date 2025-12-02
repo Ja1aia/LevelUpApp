@@ -553,3 +553,75 @@ export async function getFriendRequests(userId: string) {
     return { data: [], error };
   }
 }
+
+// ==================== GAME INVITES ====================
+
+/**
+ * Create game invite
+ */
+export async function createGameInvite(senderId: string, receiverId: string, roomId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('game_invites')
+      .insert({
+        sender_id: senderId,
+        receiver_id: receiverId,
+        room_id: roomId,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    return { data, error };
+  } catch (error) {
+    console.error('createGameInvite error:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Get pending game invites for user
+ */
+export async function getGameInvites(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('game_invites')
+      .select(`
+        id,
+        sender_id,
+        room_id,
+        created_at,
+        sender:users!game_invites_sender_id_fkey(id, username, elo, avatar),
+        room:rooms!game_invites_room_id_fkey(room_code)
+      `)
+      .eq('receiver_id', userId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return { data, error: null };
+  } catch (error) {
+    console.error('getGameInvites error:', error);
+    return { data: [], error };
+  }
+}
+
+/**
+ * Respond to game invite
+ */
+export async function respondToGameInvite(inviteId: string, status: 'accepted' | 'rejected' | 'expired') {
+  try {
+    const { data, error } = await supabase
+      .from('game_invites')
+      .update({ status })
+      .eq('id', inviteId)
+      .select()
+      .single();
+
+    return { data, error };
+  } catch (error) {
+    console.error('respondToGameInvite error:', error);
+    return { data: null, error };
+  }
+}
