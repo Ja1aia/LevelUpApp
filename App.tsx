@@ -87,16 +87,12 @@ export default function App() {
           } else {
             // No session but have stored data - clear it
             console.log('App: Session expired, clearing stored data');
-            await AsyncStorage.removeItem('userId');
-            await AsyncStorage.removeItem('username');
+            await AsyncStorage.multiRemove(['userId', 'username']);
           }
         } catch (error) {
-          // Network error or timeout - use stored data anyway for offline experience
-          console.log('App: Network error, using cached credentials for offline mode');
-          setUserId(storedUserId);
-          setUsername(storedUsername);
-          await fetchUserElo(storedUserId);
-          setCurrentScreen('lobby');
+          // Network error or timeout - don't auto-login to allow account switching
+          console.log('App: Network error, clearing cached credentials');
+          await AsyncStorage.multiRemove(['userId', 'username']);
         }
       } else {
         console.log('App: No stored credentials found');
@@ -158,21 +154,32 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      console.log('App: Logging out...');
+
       // Sign out from Supabase
       await supabase.auth.signOut();
 
-      // Clear AsyncStorage
-      await AsyncStorage.removeItem('userId');
-      await AsyncStorage.removeItem('username');
+      // Clear ALL AsyncStorage data
+      await AsyncStorage.multiRemove(['userId', 'username']);
 
-      // Reset state
+      // Reset all state
       setUsername('');
       setUserId('');
+      setUserElo(1000);
+      setRoomId('');
+      setRoomCode('');
+      setAnswers([]);
+      setQuestions([]);
       setCurrentScreen('home');
 
       console.log('App: Logged out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
+      // Force clear even if error
+      await AsyncStorage.clear();
+      setUsername('');
+      setUserId('');
+      setCurrentScreen('home');
     }
   };
 

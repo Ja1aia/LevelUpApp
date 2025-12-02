@@ -66,8 +66,8 @@ export default function PracticeModeScreen({
       const { data: questionsData, error: questionsError } = await supabase.rpc(
         'get_questions_by_elo',
         {
-          player_elo: userElo,
-          question_count: 10, // Practice with 10 questions
+          user_elo: userElo,
+          limit_count: 10, // Practice with 10 questions
         }
       );
 
@@ -86,8 +86,17 @@ export default function PracticeModeScreen({
         return;
       }
 
-      console.log('Practice questions loaded:', questionsData.length);
-      setQuestions(questionsData);
+      // Transform database format to app format
+      const transformedQuestions: Question[] = questionsData.map((q: any) => ({
+        id: q.id,
+        question: q.question_text,
+        options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+        correctAnswer: q.correct_answer,
+        topic: q.topic,
+      }));
+
+      console.log('Practice questions loaded:', transformedQuestions.length);
+      setQuestions(transformedQuestions);
       setLoadingQuestions(false);
       setQuestionStartTime(Date.now());
     } catch (error) {
