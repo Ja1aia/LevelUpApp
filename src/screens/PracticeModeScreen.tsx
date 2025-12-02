@@ -43,6 +43,7 @@ export default function PracticeModeScreen({
   const timerProgress = (timeLeft / TIMER_DURATION) * 100;
   const score = answers.filter((a) => a.isCorrect).length;
 
+
   // Fetch questions based on user ELO
   useEffect(() => {
     fetchPracticeQuestions();
@@ -236,16 +237,15 @@ export default function PracticeModeScreen({
 
       {/* Single Player Card for Practice Mode */}
       <View style={styles.playersContainer}>
-        <View style={styles.singlePlayerWrapper}>
-          <PlayerCard
-            username={username}
-            elo={userElo}
-            currentScore={score}
-            totalQuestions={currentIndex}
-            isYou={true}
-            avatar="😊"
-          />
-        </View>
+        <PlayerCard
+          username={username}
+          elo={userElo}
+          currentScore={score}
+          totalQuestions={currentIndex}
+          isYou={true}
+          avatar="😊"
+          style={{ flex: 0, width: '100%' }}
+        />
       </View>
 
       {/* Question Card - dari PracticeMode style */}
@@ -371,10 +371,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: COLORS.white,
-  },
-  singlePlayerWrapper: {
-    width: '100%',
-    alignItems: 'center',
   },
   content: {
     flex: 1,
