@@ -133,7 +133,7 @@ export default function PracticeModeScreen({
     // Record timeout as incorrect
     const answer: Answer = {
       questionId: currentQuestion.id,
-      selectedAnswer: -1,
+      selectedOption: -1,
       isCorrect: false,
       timeSpent: TIMER_DURATION,
     };
@@ -162,7 +162,7 @@ export default function PracticeModeScreen({
 
     const answer: Answer = {
       questionId: currentQuestion.id,
-      selectedAnswer: answerIndex,
+      selectedOption: answerIndex,
       isCorrect,
       timeSpent,
     };
