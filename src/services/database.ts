@@ -398,3 +398,158 @@ export async function saveAnswer(
     return { data: null, error };
   }
 }
+
+// ==================== FRIENDS ====================
+
+/**
+ * Send friend request
+ */
+export async function sendFriendRequest(userId: string, targetUsername: string) {
+  try {
+    // 1. Find target user
+    const { data: targetUser, error: findError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', targetUsername)
+      .single();
+
+    if (findError || !targetUser) {
+      return { data: null, error: new Error('User not found') };
+    }
+
+    if (targetUser.id === userId) {
+      return { data: null, error: new Error('You cannot add yourself') };
+    }
+
+    // 2. Check if request already exists
+    const { data: existing } = await supabase
+      .from('friendships')
+      .select('*')
+      .or(`and(user_id_1.eq.${userId},user_id_2.eq.${targetUser.id}),and(user_id_1.eq.${targetUser.id},user_id_2.eq.${userId})`)
+      .single();
+
+    if (existing) {
+      if (existing.status === 'accepted') {
+        return { data: null, error: new Error('Already friends') };
+      }
+      if (existing.status === 'pending') {
+        return { data: null, error: new Error('Friend request already pending') };
+      }
+    }
+
+    // 3. Create request
+    const { data, error } = await supabase
+      .from('friendships')
+      .insert({
+        user_id_1: userId,
+        user_id_2: targetUser.id,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    return { data, error };
+  } catch (error) {
+    console.error('sendFriendRequest error:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Accept friend request
+ */
+export async function acceptFriendRequest(requestId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('friendships')
+      .update({ status: 'accepted' })
+      .eq('id', requestId)
+      .select()
+      .single();
+
+    return { data, error };
+  } catch (error) {
+    console.error('acceptFriendRequest error:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Reject/Cancel friend request or Unfriend
+ */
+export async function removeFriend(requestId: string) {
+  try {
+    const { error } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('id', requestId);
+
+    return { error };
+  } catch (error) {
+    console.error('removeFriend error:', error);
+    return { error };
+  }
+}
+
+/**
+ * Get friends list
+ */
+export async function getFriends(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('friendships')
+      .select(`
+        id,
+        user_id_1,
+        user_id_2,
+        status,
+        user1:users!friendships_user_id_1_fkey(id, username, elo, avatar),
+        user2:users!friendships_user_id_2_fkey(id, username, elo, avatar)
+      `)
+      .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
+      .eq('status', 'accepted');
+
+    if (error) throw error;
+
+    // Transform data to get the OTHER user
+    const friends = data.map((f: any) => {
+      const isUser1 = f.user_id_1 === userId;
+      const friendData = isUser1 ? f.user2 : f.user1;
+      return {
+        friendshipId: f.id,
+        ...friendData
+      };
+    });
+
+    return { data: friends, error: null };
+  } catch (error) {
+    console.error('getFriends error:', error);
+    return { data: [], error };
+  }
+}
+
+/**
+ * Get pending friend requests
+ */
+export async function getFriendRequests(userId: string) {
+  try {
+    // Incoming requests: user_id_2 is me, status is pending
+    const { data, error } = await supabase
+      .from('friendships')
+      .select(`
+        id,
+        user_id_1,
+        created_at,
+        sender:users!friendships_user_id_1_fkey(id, username, elo, avatar)
+      `)
+      .eq('user_id_2', userId)
+      .eq('status', 'pending');
+
+    if (error) throw error;
+
+    return { data, error: null };
+  } catch (error) {
+    console.error('getFriendRequests error:', error);
+    return { data: [], error };
+  }
+}

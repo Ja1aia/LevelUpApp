@@ -13,11 +13,12 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import MatchHistoryScreen from './src/screens/MatchHistoryScreen';
 import MatchDetailsScreen from './src/screens/MatchDetailsScreen';
 import PracticeModeScreen from './src/screens/PracticeModeScreen';
+import FriendsScreen from './src/screens/FriendsScreen';
 import { Answer, Question } from './src/types';
 import { supabase } from './src/lib/supabase';
 import { COLORS } from './src/theme/colors';
 
-type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails' | 'practice';
+type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails' | 'practice' | 'friends';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -215,6 +216,7 @@ export default function App() {
             onViewProfile={() => setCurrentScreen('profile')}
             onViewMatchHistory={() => setCurrentScreen('matchHistory')}
             onPracticeMode={() => setCurrentScreen('practice')}
+            onViewFriends={() => setCurrentScreen('friends')}
             onLogout={handleLogout}
           />
         )}
@@ -298,6 +300,12 @@ export default function App() {
             answers={answers}
             questions={questions}
             onPlayAgain={handlePlayAgain}
+          />
+        )}
+        {currentScreen === 'friends' && (
+          <FriendsScreen
+            userId={userId}
+            onBack={() => setCurrentScreen('lobby')}
           />
         )}
       </SafeAreaView>

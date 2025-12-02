@@ -26,6 +26,7 @@ interface LobbyScreenProps {
   onViewProfile: () => void;
   onViewMatchHistory: () => void;
   onPracticeMode: () => void;
+  onViewFriends: () => void;
   onLogout: () => void;
 }
 
@@ -38,6 +39,7 @@ export default function LobbyScreen({
   onViewProfile,
   onViewMatchHistory,
   onPracticeMode,
+  onViewFriends,
   onLogout,
 }: LobbyScreenProps) {
   const [roomCodeInput, setRoomCodeInput] = useState('');
@@ -133,160 +135,173 @@ export default function LobbyScreen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-        {/* Top Bar with Burger Menu */}
-        <View style={styles.topBar}>
-          <View style={styles.topBarSpacer} />
+          {/* Top Bar with Burger Menu */}
+          <View style={styles.topBar}>
+            <View style={styles.topBarSpacer} />
 
-          {/* Burger Menu Button */}
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => setMenuVisible(!menuVisible)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.menuIcon}>☰</Text>
-          </TouchableOpacity>
+            {/* Burger Menu Button */}
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => setMenuVisible(!menuVisible)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.menuIcon}>☰</Text>
+            </TouchableOpacity>
 
-          {/* Dropdown Menu with TouchableWithoutFeedback */}
-          {menuVisible && (
-            <>
-              <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
-                <View style={styles.menuOverlay} />
-              </TouchableWithoutFeedback>
-              <View style={styles.dropdown}>
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setMenuVisible(false);
-                    onPracticeMode();
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.dropdownText}>🎯 Practice Mode</Text>
-                </TouchableOpacity>
-
-                <View style={styles.dropdownDivider} />
-
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setMenuVisible(false);
-                    onViewMatchHistory();
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.dropdownText}>📜 Match History</Text>
-                </TouchableOpacity>
-
-                <View style={styles.dropdownDivider} />
-
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setMenuVisible(false);
-                    Alert.alert(
-                      'Logout',
-                      'Are you sure you want to logout?',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Logout',
-                          style: 'destructive',
-                          onPress: onLogout
-                        }
-                      ]
-                    );
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.dropdownText, { color: '#FF4444' }]}>🚪 Logout</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </View>
-
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Multiplayer Battle</Text>
-          <Text style={styles.subtitle}>Choose your mode</Text>
-        </View>
-
-        {/* User Info Card - Tap to view profile */}
-        <TouchableOpacity style={styles.userCard} onPress={onViewProfile} activeOpacity={0.7}>
-          <View style={styles.userAvatarCircle}>
-            <Text style={styles.userAvatarIcon}>👤</Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{username}</Text>
-            <Text style={styles.tapHint}>Tap to view profile</Text>
-          </View>
-          <View style={styles.eloChip}>
-            <Text style={styles.eloText}>{userElo} ELO</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Create Room Section */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[styles.createButton, loading && styles.buttonDisabled]}
-            onPress={handleCreateRoom}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator color="#1A1A1A" />
-            ) : (
+            {/* Dropdown Menu with TouchableWithoutFeedback */}
+            {menuVisible && (
               <>
-                <Text style={styles.createButtonIcon}>🎮</Text>
-                <Text style={styles.createButtonText}>CREATE NEW ROOM</Text>
+                <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+                  <View style={styles.menuOverlay} />
+                </TouchableWithoutFeedback>
+                <View style={styles.dropdown}>
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setMenuVisible(false);
+                      onViewFriends();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.dropdownText}>👥 Friends</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.dropdownDivider} />
+
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setMenuVisible(false);
+                      onPracticeMode();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.dropdownText}>🎯 Practice Mode</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.dropdownDivider} />
+
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setMenuVisible(false);
+                      onViewMatchHistory();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.dropdownText}>📜 Match History</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.dropdownDivider} />
+
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setMenuVisible(false);
+                      Alert.alert(
+                        'Logout',
+                        'Are you sure you want to logout?',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Logout',
+                            style: 'destructive',
+                            onPress: onLogout
+                          }
+                        ]
+                      );
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.dropdownText, { color: '#FF4444' }]}>🚪 Logout</Text>
+                  </TouchableOpacity>
+                </View>
               </>
             )}
+          </View>
+
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Multiplayer Battle</Text>
+            <Text style={styles.subtitle}>Choose your mode</Text>
+          </View>
+
+          {/* User Info Card - Tap to view profile */}
+          <TouchableOpacity style={styles.userCard} onPress={onViewProfile} activeOpacity={0.7}>
+            <View style={styles.userAvatarCircle}>
+              <Text style={styles.userAvatarIcon}>👤</Text>
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{username}</Text>
+              <Text style={styles.tapHint}>Tap to view profile</Text>
+            </View>
+            <View style={styles.eloChip}>
+              <Text style={styles.eloText}>{userElo} ELO</Text>
+            </View>
           </TouchableOpacity>
-          <Text style={styles.createHint}>Host a game and share the code</Text>
-        </View>
 
-        {/* Divider */}
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.dividerLine} />
-        </View>
+          {/* Create Room Section */}
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={[styles.createButton, loading && styles.buttonDisabled]}
+              onPress={handleCreateRoom}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#1A1A1A" />
+              ) : (
+                <>
+                  <Text style={styles.createButtonIcon}>🎮</Text>
+                  <Text style={styles.createButtonText}>CREATE NEW ROOM</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.createHint}>Host a game and share the code</Text>
+          </View>
 
-        {/* Join Room Section */}
-        <View style={styles.section}>
-          <Text style={styles.inputLabel}>Join Existing Room</Text>
-          <TextInput
-            style={[styles.input, error && styles.inputError]}
-            placeholder="Enter Room Code (e.g., ABC123)"
-            placeholderTextColor="#B0B0B0"
-            value={roomCodeInput}
-            onChangeText={(text) => {
-              setRoomCodeInput(text.toUpperCase());
-              setError('');
-            }}
-            maxLength={6}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            editable={!loading}
-          />
-          {error && <Text style={styles.errorText}>{error}</Text>}
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
-          <TouchableOpacity
-            style={[
-              styles.joinButton,
-              (!roomCodeInput.trim() || loading) && styles.buttonDisabled,
-            ]}
-            onPress={handleJoinRoom}
-            disabled={!roomCodeInput.trim() || loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator color={COLORS.primary} />
-            ) : (
-              <Text style={styles.joinButtonText}>JOIN ROOM</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+          {/* Join Room Section */}
+          <View style={styles.section}>
+            <Text style={styles.inputLabel}>Join Existing Room</Text>
+            <TextInput
+              style={[styles.input, error && styles.inputError]}
+              placeholder="Enter Room Code (e.g., ABC123)"
+              placeholderTextColor="#B0B0B0"
+              value={roomCodeInput}
+              onChangeText={(text) => {
+                setRoomCodeInput(text.toUpperCase());
+                setError('');
+              }}
+              maxLength={6}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!loading}
+            />
+            {error && <Text style={styles.errorText}>{error}</Text>}
+
+            <TouchableOpacity
+              style={[
+                styles.joinButton,
+                (!roomCodeInput.trim() || loading) && styles.buttonDisabled,
+              ]}
+              onPress={handleJoinRoom}
+              disabled={!roomCodeInput.trim() || loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color={COLORS.primary} />
+              ) : (
+                <Text style={styles.joinButtonText}>JOIN ROOM</Text>
+              )}
+            </TouchableOpacity>
+          </View>
 
         </ScrollView>
       </TouchableWithoutFeedback>
