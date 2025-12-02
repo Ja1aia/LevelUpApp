@@ -246,7 +246,7 @@ export default function ResultsScreen({
         {/* Your Card */}
         <View style={[styles.playerCard, isWinner && styles.playerCardWinner]}>
           <View style={styles.playerHeader}>
-            <Text style={styles.playerAvatar}>😊</Text>
+            <Text style={styles.playerAvatar}>👤</Text>
             <Text style={styles.playerName} numberOfLines={1}>
               {username}
             </Text>
@@ -288,7 +288,7 @@ export default function ResultsScreen({
         {/* Opponent Card */}
         <View style={[styles.playerCard, !isWinner && !isDraw && styles.playerCardWinner]}>
           <View style={styles.playerHeader}>
-            <Text style={styles.playerAvatar}>🤖</Text>
+            <Text style={styles.playerAvatar}>👤</Text>
             <Text style={styles.playerName} numberOfLines={1}>{opponentUsername}</Text>
           </View>
 

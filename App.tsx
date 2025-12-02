@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, ActivityIndicator, View } from 'react-native';
+import { StyleSheet, ActivityIndicator, View, Alert } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from './src/screens/LoginScreen';
@@ -12,11 +12,12 @@ import ResultsScreen from './src/screens/ResultsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import MatchHistoryScreen from './src/screens/MatchHistoryScreen';
 import MatchDetailsScreen from './src/screens/MatchDetailsScreen';
+import PracticeModeScreen from './src/screens/PracticeModeScreen';
 import { Answer, Question } from './src/types';
 import { supabase } from './src/lib/supabase';
 import { COLORS } from './src/theme/colors';
 
-type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails';
+type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails' | 'practice';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -206,6 +207,7 @@ export default function App() {
             onRoomJoined={handleRoomJoined}
             onViewProfile={() => setCurrentScreen('profile')}
             onViewMatchHistory={() => setCurrentScreen('matchHistory')}
+            onPracticeMode={() => setCurrentScreen('practice')}
             onLogout={handleLogout}
           />
         )}
@@ -233,6 +235,21 @@ export default function App() {
             matchId={selectedMatchId}
             userId={userId}
             onBack={() => setCurrentScreen('matchHistory')}
+          />
+        )}
+
+        {currentScreen === 'practice' && (
+          <PracticeModeScreen
+            userId={userId}
+            username={username}
+            onBack={() => setCurrentScreen('lobby')}
+            onComplete={(score, total) => {
+              Alert.alert(
+                'Practice Complete!',
+                `You scored ${score} out of ${total} questions correctly!`,
+                [{ text: 'OK', onPress: () => setCurrentScreen('lobby') }]
+              );
+            }}
           />
         )}
 

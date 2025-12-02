@@ -225,7 +225,7 @@ export default function MatchHistoryScreen({
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Match History</Text>
           <View style={styles.headerSpacer} />
@@ -243,7 +243,7 @@ export default function MatchHistoryScreen({
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Match History</Text>
           <View style={styles.headerSpacer} />
@@ -262,7 +262,7 @@ export default function MatchHistoryScreen({
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Match History</Text>
         <View style={styles.headerSpacer} />
@@ -299,17 +299,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.background,
   },
   backButton: {
-    padding: 8,
+    backgroundColor: COLORS.white,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   backButtonText: {
-    fontSize: 16,
-    color: COLORS.primary,
+    fontSize: 14,
     fontWeight: '600',
+    color: COLORS.textPrimary,
   },
   headerTitle: {
     fontSize: 20,

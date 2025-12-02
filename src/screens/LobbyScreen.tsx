@@ -9,6 +9,9 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { createRoom, joinRoom } from '../services/database';
@@ -22,6 +25,7 @@ interface LobbyScreenProps {
   onRoomJoined: (roomId: string, roomCode: string) => void;
   onViewProfile: () => void;
   onViewMatchHistory: () => void;
+  onPracticeMode: () => void;
   onLogout: () => void;
 }
 
@@ -33,6 +37,7 @@ export default function LobbyScreen({
   onRoomJoined,
   onViewProfile,
   onViewMatchHistory,
+  onPracticeMode,
   onLogout,
 }: LobbyScreenProps) {
   const [roomCodeInput, setRoomCodeInput] = useState('');
@@ -119,10 +124,15 @@ export default function LobbyScreen({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-      <View style={styles.content}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         {/* Top Bar with Burger Menu */}
         <View style={styles.topBar}>
           <View style={styles.topBarSpacer} />
@@ -136,44 +146,62 @@ export default function LobbyScreen({
             <Text style={styles.menuIcon}>☰</Text>
           </TouchableOpacity>
 
-          {/* Dropdown Menu */}
+          {/* Dropdown Menu with TouchableWithoutFeedback */}
           {menuVisible && (
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  onViewMatchHistory();
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.dropdownText}>📜 Match History</Text>
-              </TouchableOpacity>
+            <>
+              <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+                <View style={styles.menuOverlay} />
+              </TouchableWithoutFeedback>
+              <View style={styles.dropdown}>
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setMenuVisible(false);
+                    onPracticeMode();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.dropdownText}>🎯 Practice Mode</Text>
+                </TouchableOpacity>
 
-              <View style={styles.dropdownDivider} />
+                <View style={styles.dropdownDivider} />
 
-              <TouchableOpacity
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  Alert.alert(
-                    'Logout',
-                    'Are you sure you want to logout?',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Logout',
-                        style: 'destructive',
-                        onPress: onLogout
-                      }
-                    ]
-                  );
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.dropdownText, { color: '#FF4444' }]}>🚪 Logout</Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setMenuVisible(false);
+                    onViewMatchHistory();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.dropdownText}>📜 Match History</Text>
+                </TouchableOpacity>
+
+                <View style={styles.dropdownDivider} />
+
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setMenuVisible(false);
+                    Alert.alert(
+                      'Logout',
+                      'Are you sure you want to logout?',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Logout',
+                          style: 'destructive',
+                          onPress: onLogout
+                        }
+                      ]
+                    );
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.dropdownText, { color: '#FF4444' }]}>🚪 Logout</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           )}
         </View>
 
@@ -260,7 +288,8 @@ export default function LobbyScreen({
           </TouchableOpacity>
         </View>
 
-      </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
@@ -270,10 +299,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFA',
   },
-  content: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 70,
+    paddingBottom: 40,
   },
   topBar: {
     position: 'absolute',
@@ -306,6 +336,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#1A1A1A',
     fontWeight: 'bold',
+  },
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
   },
   dropdown: {
     position: 'absolute',

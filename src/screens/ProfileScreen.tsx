@@ -92,7 +92,10 @@ export default function ProfileScreen({ userId, onBack }: ProfileScreenProps) {
   };
 
   const getRank = (correct: number, total: number): string => {
+    // Require minimum 15 questions before showing rank
+    if (total < 15) return `${total}/15`;
     if (total === 0) return 'Unranked';
+
     const percentage = (correct / total) * 100;
 
     if (percentage >= 90) return 'S';
@@ -104,6 +107,9 @@ export default function ProfileScreen({ userId, onBack }: ProfileScreenProps) {
   };
 
   const getRankColor = (rank: string): string => {
+    // Gray color for incomplete data (shows progress like "5/15")
+    if (rank.includes('/')) return '#B0B0B0';
+
     switch (rank) {
       case 'S': return '#FFD700'; // Gold
       case 'A': return '#00D084'; // Green
@@ -216,16 +222,32 @@ export default function ProfileScreen({ userId, onBack }: ProfileScreenProps) {
           ) : (
             topicStats.map((stat, index) => {
               const rank = getRank(stat.total_correct, stat.total_answered);
+              const needsMoreQuestions = stat.total_answered < 15;
+              const questionsNeeded = 15 - stat.total_answered;
+
               return (
                 <View key={index} style={styles.topicRow}>
                   <Text style={styles.topicName}>{stat.topic}</Text>
                   <View style={styles.rankContainer}>
-                    <Text style={[styles.rankText, { color: getRankColor(rank) }]}>
-                      {rank}
-                    </Text>
-                    <Text style={styles.rankDetail}>
-                      ({stat.total_correct}/{stat.total_answered})
-                    </Text>
+                    {needsMoreQuestions ? (
+                      <>
+                        <Text style={[styles.rankText, { color: getRankColor(rank) }]}>
+                          {rank}
+                        </Text>
+                        <Text style={styles.rankDetail}>
+                          ({questionsNeeded} more to unlock)
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={[styles.rankText, { color: getRankColor(rank) }]}>
+                          {rank}
+                        </Text>
+                        <Text style={styles.rankDetail}>
+                          ({stat.total_correct}/{stat.total_answered})
+                        </Text>
+                      </>
+                    )}
                   </View>
                 </View>
               );
@@ -428,7 +450,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   rankDetail: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
+    fontSize: 10,
+    color: COLORS.error,
   },
 });

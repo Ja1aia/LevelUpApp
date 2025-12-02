@@ -39,7 +39,7 @@ export const QUESTIONS: Question[] = [
 ];
 
 // Timer duration per question (in seconds)
-export const TIMER_DURATION = 10;
+export const TIMER_DURATION = 20;
 
 // Total questions in quiz
 export const TOTAL_QUESTIONS = QUESTIONS.length;
