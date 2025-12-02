@@ -419,12 +419,12 @@ export default function QuizScreen({
             />
           </View>
 
-          {/* Question */}
+          {/* Question - PracticeMode Style */}
           <View style={styles.questionCard}>
             <Text style={styles.questionText}>{currentQuestion?.question}</Text>
           </View>
 
-          {/* Options */}
+          {/* Options - PracticeMode Style with Letter Labels */}
           <View style={styles.optionsContainer}>
             {currentQuestion?.options.map((option, index) => (
               <TouchableOpacity
@@ -434,7 +434,10 @@ export default function QuizScreen({
                 disabled={selectedAnswer !== null}
                 activeOpacity={0.7}
               >
-                <Text style={styles.optionText}>{option}</Text>
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionLabel}>{String.fromCharCode(65 + index)}</Text>
+                  <Text style={styles.optionText}>{option}</Text>
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -447,7 +450,7 @@ export default function QuizScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: COLORS.background,
     padding: 16,
   },
   header: {
@@ -467,7 +470,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   timerContainer: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -496,7 +499,7 @@ const styles = StyleSheet.create({
   },
   questionCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 20,
     shadowColor: COLORS.shadow,
@@ -506,10 +509,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   questionText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    textAlign: 'center',
+    lineHeight: 26,
   },
   optionsContainer: {
     gap: 12,
@@ -522,14 +525,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   optionButtonCorrect: {
-    backgroundColor: COLORS.success,
+    backgroundColor: '#E8F5E9',
     borderColor: COLORS.success,
     borderRadius: 12,
     padding: 16,
     borderWidth: 2,
   },
   optionButtonWrong: {
-    backgroundColor: COLORS.error,
+    backgroundColor: '#FFEBEE',
     borderColor: COLORS.error,
     borderRadius: 12,
     padding: 16,
@@ -543,10 +546,26 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 2,
   },
-  optionText: {
-    fontSize: 18,
+  optionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  optionLabel: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryLight,
     color: COLORS.textPrimary,
+    fontSize: 16,
+    fontWeight: 'bold',
     textAlign: 'center',
+    lineHeight: 32,
+    marginRight: 12,
+  },
+  optionText: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.textPrimary,
     fontWeight: '500',
   },
   loadingContainer: {

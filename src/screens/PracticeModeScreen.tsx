@@ -7,11 +7,15 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { Question, Answer } from '../types';
 import { TIMER_DURATION } from '../utils/questions';
 import { supabase } from '../lib/supabase';
+import PlayerCard from '../components/PlayerCard';
+
+const { width } = Dimensions.get('window');
 
 interface PracticeModeScreenProps {
   userId: string;
@@ -33,10 +37,11 @@ export default function PracticeModeScreen({
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
-  const [score, setScore] = useState(0);
+  const [userElo, setUserElo] = useState(1000);
 
   const currentQuestion = questions[currentIndex];
   const timerProgress = (timeLeft / TIMER_DURATION) * 100;
+  const score = answers.filter((a) => a.isCorrect).length;
 
   // Fetch questions based on user ELO
   useEffect(() => {
@@ -60,13 +65,14 @@ export default function PracticeModeScreen({
         return;
       }
 
-      const userElo = userData?.elo || 1000;
+      const fetchedElo = userData?.elo || 1000;
+      setUserElo(fetchedElo);
 
       // Fetch questions from RPC function (same as competitive mode)
       const { data: questionsData, error: questionsError } = await supabase.rpc(
         'get_questions_by_elo',
         {
-          user_elo: userElo,
+          user_elo: fetchedElo,
           limit_count: 10, // Practice with 10 questions
         }
       );
@@ -109,18 +115,17 @@ export default function PracticeModeScreen({
   useEffect(() => {
     if (loadingQuestions || !currentQuestion) return;
 
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          handleTimeout();
-          return TIMER_DURATION;
-        }
-        return prev - 1;
-      });
+    if (timeLeft === 0) {
+      handleTimeout();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [currentIndex, loadingQuestions]);
+    return () => clearInterval(timer);
+  }, [timeLeft, loadingQuestions]);
 
   const handleTimeout = () => {
     if (!currentQuestion) return;
@@ -129,7 +134,6 @@ export default function PracticeModeScreen({
     const answer: Answer = {
       questionId: currentQuestion.id,
       selectedAnswer: -1,
-      correctAnswer: currentQuestion.correctAnswer,
       isCorrect: false,
       timeSpent: TIMER_DURATION,
     };
@@ -159,17 +163,12 @@ export default function PracticeModeScreen({
     const answer: Answer = {
       questionId: currentQuestion.id,
       selectedAnswer: answerIndex,
-      correctAnswer: currentQuestion.correctAnswer,
       isCorrect,
       timeSpent,
     };
 
     const newAnswers = [...answers, answer];
     setAnswers(newAnswers);
-
-    if (isCorrect) {
-      setScore(score + 1);
-    }
 
     // Auto-advance after 1.5 seconds
     setTimeout(() => {
@@ -192,13 +191,6 @@ export default function PracticeModeScreen({
   if (loadingQuestions) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Practice Mode</Text>
-          <View style={styles.headerSpacer} />
-        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading practice questions...</Text>
@@ -210,15 +202,11 @@ export default function PracticeModeScreen({
   if (!currentQuestion) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Practice Mode</Text>
-          <View style={styles.headerSpacer} />
-        </View>
         <View style={styles.loadingContainer}>
           <Text style={styles.errorText}>No questions available</Text>
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backButtonText}>Back to Lobby</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -226,57 +214,47 @@ export default function PracticeModeScreen({
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header - sama dengan QuizScreen */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Practice Mode</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      {/* Progress and Score */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressInfo}>
-          <Text style={styles.progressText}>
+        <View>
+          <Text style={styles.questionNumber}>
             Question {currentIndex + 1}/{questions.length}
           </Text>
-          <Text style={styles.scoreText}>Score: {score}</Text>
+          {currentQuestion?.topic && (
+            <Text style={styles.topicText}>{currentQuestion.topic}</Text>
+          )}
         </View>
-        <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${((currentIndex + 1) / questions.length) * 100}%` },
-            ]}
+        <View style={styles.timerContainer}>
+          <Text style={styles.timer}>⏱️ {timeLeft}s</Text>
+        </View>
+      </View>
+
+      {/* Timer Progress Bar - sama dengan QuizScreen */}
+      <View style={styles.progressBarContainer}>
+        <View style={[styles.progressBar, { width: `${timerProgress}%` }]} />
+      </View>
+
+      {/* Single Player Card for Practice Mode */}
+      <View style={styles.playersContainer}>
+        <View style={styles.singlePlayerWrapper}>
+          <PlayerCard
+            username={username}
+            elo={userElo}
+            currentScore={score}
+            totalQuestions={currentIndex}
+            isYou={true}
+            avatar="😊"
           />
         </View>
       </View>
 
-      {/* Timer */}
-      <View style={styles.timerContainer}>
-        <View style={styles.timerBar}>
-          <View
-            style={[
-              styles.timerFill,
-              {
-                width: `${timerProgress}%`,
-                backgroundColor: timeLeft <= 5 ? '#FF4444' : COLORS.primary,
-              },
-            ]}
-          />
-        </View>
-        <Text style={styles.timerText}>{timeLeft}s</Text>
-      </View>
-
-      {/* Question */}
+      {/* Question Card - dari PracticeMode style */}
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         <View style={styles.questionCard}>
-          <Text style={styles.topicBadge}>{currentQuestion.topic}</Text>
           <Text style={styles.questionText}>{currentQuestion.question}</Text>
         </View>
 
-        {/* Answer Options */}
+        {/* Answer Options - dari PracticeMode style */}
         <View style={styles.optionsContainer}>
           {currentQuestion.options.map((option, index) => {
             const isSelected = selectedAnswer === index;
@@ -311,6 +289,11 @@ export default function PracticeModeScreen({
           })}
         </View>
       </ScrollView>
+
+      {/* Cancel Button */}
+      <TouchableOpacity style={styles.cancelButton} onPress={onBack}>
+        <Text style={styles.cancelButtonText}>Cancel Practice</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -319,36 +302,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    backgroundColor: COLORS.background,
-  },
-  backButton: {
-    backgroundColor: COLORS.white,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  backButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-  },
-  headerSpacer: {
-    width: 60,
   },
   loadingContainer: {
     flex: 1,
@@ -363,61 +316,65 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 16,
     color: COLORS.error,
+    marginBottom: 16,
   },
-  progressContainer: {
-    paddingHorizontal: 16,
+  backButton: {
+    backgroundColor: COLORS.primary,
     paddingVertical: 12,
-    backgroundColor: COLORS.white,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
-  progressInfo: {
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  // Header styles - dari QuizScreen
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  progressText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  scoreText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: COLORS.border,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 3,
-  },
-  timerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 20,
     backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
-  timerBar: {
-    height: 8,
-    backgroundColor: COLORS.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
-  timerFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  timerText: {
-    fontSize: 14,
+  questionNumber: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
-    textAlign: 'center',
+  },
+  topicText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  timerContainer: {
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  timer: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+  },
+  progressBarContainer: {
+    height: 6,
+    backgroundColor: COLORS.border,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+  },
+  playersContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.white,
+  },
+  singlePlayerWrapper: {
+    width: '100%',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
@@ -425,6 +382,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
   },
+  // Question and Options - dari PracticeMode style
   questionCard: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
@@ -435,17 +393,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
-  },
-  topicBadge: {
-    backgroundColor: COLORS.primaryLight,
-    color: COLORS.textPrimary,
-    fontSize: 12,
-    fontWeight: '600',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
   },
   questionText: {
     fontSize: 18,
@@ -498,5 +445,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     fontWeight: '500',
+  },
+  cancelButton: {
+    margin: 16,
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.error,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: COLORS.error,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
