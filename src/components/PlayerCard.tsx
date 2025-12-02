@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { COLORS } from '../theme/colors';
 
 interface PlayerCardProps {
@@ -9,6 +9,7 @@ interface PlayerCardProps {
   totalQuestions: number;
   isYou?: boolean;
   avatar?: string;
+  style?: StyleProp<ViewStyle>;
 }
 
 export default function PlayerCard({
@@ -18,9 +19,12 @@ export default function PlayerCard({
   totalQuestions,
   isYou = false,
   avatar = '😊',
+  style,
 }: PlayerCardProps) {
+  console.log('PlayerCard - Username:', username, 'ELO:', elo);
+
   return (
-    <View style={[styles.container, isYou && styles.containerHighlight]}>
+    <View style={[styles.container, isYou && styles.containerHighlight, style]}>
       {/* Avatar */}
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{avatar}</Text>
@@ -28,8 +32,8 @@ export default function PlayerCard({
 
       {/* Player Info */}
       <View style={styles.infoContainer}>
-        <Text style={styles.username} numberOfLines={1}>
-          {username}
+        <Text style={styles.username} testID="player-username">
+          {username && username.trim() !== '' ? username : 'Player'}
         </Text>
         <Text style={styles.elo}>{elo} ELO</Text>
       </View>
@@ -78,12 +82,14 @@ const styles = StyleSheet.create({
   infoContainer: {
     flex: 1,
     justifyContent: 'center',
+    minWidth: 0, // Allow text to shrink
   },
   username: {
     fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
     marginBottom: 2,
+    flexShrink: 1, // Allow text to wrap/shrink
   },
   elo: {
     fontSize: 12,
