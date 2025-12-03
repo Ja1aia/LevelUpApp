@@ -14,11 +14,12 @@ import MatchHistoryScreen from './src/screens/MatchHistoryScreen';
 import MatchDetailsScreen from './src/screens/MatchDetailsScreen';
 import PracticeModeScreen from './src/screens/PracticeModeScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
+import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import { Answer, Question } from './src/types';
 import { supabase } from './src/lib/supabase';
 import { COLORS } from './src/theme/colors';
 
-type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails' | 'practice' | 'friends';
+type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails' | 'practice' | 'friends' | 'leaderboard';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -217,6 +218,7 @@ export default function App() {
             onViewMatchHistory={() => setCurrentScreen('matchHistory')}
             onPracticeMode={() => setCurrentScreen('practice')}
             onViewFriends={() => setCurrentScreen('friends')}
+            onViewLeaderboard={() => setCurrentScreen('leaderboard')}
             onLogout={handleLogout}
           />
         )}
@@ -309,6 +311,12 @@ export default function App() {
             onBack={() => setCurrentScreen('lobby')}
             onRoomCreated={handleRoomCreated}
             onRoomJoined={handleRoomJoined}
+          />
+        )}
+        {currentScreen === 'leaderboard' && (
+          <LeaderboardScreen
+            userId={userId}
+            onBack={() => setCurrentScreen('lobby')}
           />
         )}
       </SafeAreaView>

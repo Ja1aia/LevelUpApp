@@ -625,3 +625,22 @@ export async function respondToGameInvite(inviteId: string, status: 'accepted' |
     return { data: null, error };
   }
 }
+/**
+ * Get Leaderboard (Top 50 by ELO)
+ */
+export async function getLeaderboard(limit: number = 50) {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, username, elo, avatar')
+      .order('elo', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    return { data, error: null };
+  } catch (error) {
+    console.error('getLeaderboard error:', error);
+    return { data: [], error };
+  }
+}

@@ -27,6 +27,7 @@ interface LobbyScreenProps {
   onViewMatchHistory: () => void;
   onPracticeMode: () => void;
   onViewFriends: () => void;
+  onViewLeaderboard: () => void;
   onLogout: () => void;
 }
 
@@ -40,6 +41,7 @@ export default function LobbyScreen({
   onViewMatchHistory,
   onPracticeMode,
   onViewFriends,
+  onViewLeaderboard,
   onLogout,
 }: LobbyScreenProps) {
   const [roomCodeInput, setRoomCodeInput] = useState('');
@@ -155,6 +157,19 @@ export default function LobbyScreen({
                   <View style={styles.menuOverlay} />
                 </TouchableWithoutFeedback>
                 <View style={styles.dropdown}>
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setMenuVisible(false);
+                      onViewLeaderboard();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.dropdownText}>🏆 Leaderboard</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.dropdownDivider} />
+
                   <TouchableOpacity
                     style={styles.dropdownItem}
                     onPress={() => {
