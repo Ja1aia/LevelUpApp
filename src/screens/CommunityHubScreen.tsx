@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     FlatList,
+    ScrollView,
     TouchableOpacity,
     Alert,
     ActivityIndicator,
@@ -243,7 +244,7 @@ export default function CommunityHubScreen({
     const handleRegisterTournament = async (tournamentId: string, tournamentName: string) => {
         setProcessingTournament(tournamentId);
         try {
-            const { error } = await registerForTournament(userId, tournamentId);
+            const { error } = await registerForTournament(tournamentId, userId); // tournamentId, userId
             if (error) throw error;
 
             Alert.alert('Registered!', `You are now registered for "${tournamentName}"`);
@@ -267,7 +268,7 @@ export default function CommunityHubScreen({
                     onPress: async () => {
                         setProcessingTournament(tournamentId);
                         try {
-                            const { error } = await unregisterFromTournament(userId, tournamentId);
+                            const { error } = await unregisterFromTournament(tournamentId, userId); // tournamentId, userId
                             if (error) throw error;
 
                             await fetchData();
@@ -337,7 +338,7 @@ export default function CommunityHubScreen({
                         ) : (
                             <Text style={styles.tournamentButtonText}>
                                 {isFull && !item.is_registered ? 'Full' :
-                                 item.is_registered ? 'Unregister' : 'Register'}
+                                    item.is_registered ? 'Unregister' : 'Register'}
                             </Text>
                         )}
                     </TouchableOpacity>

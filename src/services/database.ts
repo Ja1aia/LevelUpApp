@@ -592,7 +592,7 @@ export async function getGameInvites(userId: string) {
         room_id,
         created_at,
         sender:users!game_invites_sender_id_fkey(id, username, elo, avatar),
-        room:rooms!game_invites_room_id_fkey(room_code)
+        room:rooms!game_invites_room_id_fkey(room_code, tournament_match_id)
       `)
       .eq('receiver_id', userId)
       .eq('status', 'pending')
@@ -767,6 +767,12 @@ export async function getUserCommunity(userId: string) {
       .eq('user_id', userId)
       .single();
 
+    if (data) {
+      // Normalize community object (Supabase might return it as an array)
+      const community = Array.isArray(data.community) ? data.community[0] : data.community;
+      return { data: { ...data, community }, error: null };
+    }
+
     return { data, error };
   } catch (error) {
     console.error('getUserCommunity error:', error);
@@ -815,12 +821,15 @@ export async function getCommunityDetails(communityId: string) {
     return {
       data: {
         ...community,
-        members: members.map((m: any) => ({
-          membershipId: m.id,
-          role: m.role,
-          joined_at: m.joined_at,
-          ...m.user
-        }))
+        members: members.map((m: any) => {
+          const user = Array.isArray(m.user) ? m.user[0] : m.user;
+          return {
+            membershipId: m.id,
+            role: m.role,
+            joined_at: m.joined_at,
+            ...user
+          };
+        })
       },
       error: null
     };
@@ -1629,7 +1638,7 @@ export async function createTournament(
 /**
  * Get tournaments for community
  */
-export async function getCommunityTournaments(communityId: string) {
+export async function getCommunityTournaments(communityId: string, userId?: string) {
   try {
     const { data, error } = await supabase
       .from('tournaments')
@@ -1645,13 +1654,39 @@ export async function getCommunityTournaments(communityId: string) {
         registration_ends_at,
         started_at,
         completed_at,
+        created_at,
         winner:users!tournaments_winner_id_fkey(username, elo, avatar),
         creator:users!tournaments_created_by_fkey(username)
       `)
       .eq('community_id', communityId)
       .order('created_at', { ascending: false });
 
-    return { data, error };
+    if (error) throw error;
+
+    let tournaments = (data || []).map((t: any) => ({
+      ...t,
+      winner: Array.isArray(t.winner) ? t.winner[0] : t.winner,
+      creator: Array.isArray(t.creator) ? t.creator[0] : t.creator
+    }));
+
+    // If userId provided, check registration status
+    if (userId && tournaments.length > 0) {
+      const tournamentIds = tournaments.map((t: any) => t.id);
+      const { data: participations } = await supabase
+        .from('tournament_participants')
+        .select('tournament_id')
+        .eq('user_id', userId)
+        .in('tournament_id', tournamentIds);
+
+      const registeredIds = new Set((participations || []).map((p: any) => p.tournament_id));
+
+      tournaments = tournaments.map((t: any) => ({
+        ...t,
+        is_registered: registeredIds.has(t.id)
+      }));
+    }
+
+    return { data: tournaments, error: null };
   } catch (error) {
     console.error('getCommunityTournaments error:', error);
     return { data: [], error };
@@ -1952,6 +1987,16 @@ export async function createTournamentMatchRoom(
       return { data: null, error: new Error('Match already has an active room') };
     }
 
+    // Get questions for this match
+    const { data: user } = await supabase
+      .from('users')
+      .select('elo')
+      .eq('id', userId)
+      .single();
+
+    const userElo = user?.elo || 1200;
+    const questions = await getQuestionsByElo(userElo);
+
     // Create room
     const roomCode = generateRoomCode();
     const { data: room, error: roomError } = await supabase
@@ -1961,7 +2006,8 @@ export async function createTournamentMatchRoom(
         host_id: match.player1_id,
         guest_id: match.player2_id,
         status: 'waiting',
-        tournament_match_id: matchId
+        tournament_match_id: matchId,
+        questions: questions // Store the selected questions
       })
       .select()
       .single();
@@ -1977,6 +2023,13 @@ export async function createTournamentMatchRoom(
         started_at: new Date().toISOString()
       })
       .eq('id', matchId);
+
+    // Auto-send invite to opponent
+    const opponentId = match.player1_id === userId ? match.player2_id : match.player1_id;
+    if (opponentId) {
+      console.log(`Auto-sending tournament invite to ${opponentId}`);
+      await createGameInvite(userId, opponentId, room.id);
+    }
 
     return { data: room, error: null };
   } catch (error) {
@@ -2029,100 +2082,13 @@ export async function linkGameResultToMatch(
     if (matchUpdateError) return { data: null, error: matchUpdateError };
 
     // 5. Get match details to update participant status
-    const { data: match } = await supabase
-      .from('tournament_matches')
-      .select('*, tournament:tournaments(id)')
-      .eq('id', room.tournament_match_id)
-      .single();
-
-    if (match) {
-      // Mark loser as eliminated
-      const loserId = match.player1_id === winnerId ? match.player2_id : match.player1_id;
-
-      await supabase
-        .from('tournament_participants')
-        .update({ is_eliminated: true })
-        .eq('tournament_id', match.tournament_id)
-        .eq('user_id', loserId);
-
-      // Check if we need to generate next round
-      await checkAndGenerateNextRound(match.tournament_id, match.round_number);
-    }
+    // NOTE: Elimination and next round generation is now handled by database triggers
+    // See setup_tournament_triggers.sql
 
     return { data: { success: true }, error: null };
   } catch (error) {
     console.error('linkGameResultToMatch error:', error);
     return { data: null, error };
-  }
-}
-
-/**
- * Helper: Check if round is complete and generate next round matches
- */
-async function checkAndGenerateNextRound(tournamentId: string, completedRound: number) {
-  try {
-    // Get all matches for the completed round
-    const { data: roundMatches } = await supabase
-      .from('tournament_matches')
-      .select('*')
-      .eq('tournament_id', tournamentId)
-      .eq('round_number', completedRound);
-
-    if (!roundMatches) return;
-
-    // Check if all matches are completed
-    const allCompleted = roundMatches.every(m => m.status === 'completed' && m.winner_id);
-
-    if (!allCompleted) return; // Round not finished yet
-
-    // Get winners for next round
-    const winners = roundMatches.map(m => m.winner_id).filter(Boolean);
-
-    // If only one winner, tournament is complete!
-    if (winners.length === 1) {
-      await supabase
-        .from('tournaments')
-        .update({
-          status: 'completed',
-          winner_id: winners[0],
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', tournamentId);
-
-      // Update winner's placement
-      await supabase
-        .from('tournament_participants')
-        .update({ placement: 1 })
-        .eq('tournament_id', tournamentId)
-        .eq('user_id', winners[0]);
-
-      return;
-    }
-
-    // Generate next round matches
-    const nextRound = completedRound + 1;
-    const nextMatches = [];
-
-    for (let i = 0; i < winners.length; i += 2) {
-      if (i + 1 < winners.length) {
-        nextMatches.push({
-          tournament_id: tournamentId,
-          round_number: nextRound,
-          match_number: Math.floor(i / 2) + 1,
-          player1_id: winners[i],
-          player2_id: winners[i + 1],
-          status: 'pending'
-        });
-      }
-    }
-
-    if (nextMatches.length > 0) {
-      await supabase
-        .from('tournament_matches')
-        .insert(nextMatches);
-    }
-  } catch (error) {
-    console.error('checkAndGenerateNextRound error:', error);
   }
 }
 
@@ -2181,10 +2147,16 @@ export async function getCommunityStats(communityId: string) {
 
     return {
       data: {
-        topMembers: topMembers || [],
+        topMembers: (topMembers || []).map((m: any) => ({
+          ...m,
+          user: Array.isArray(m.user) ? m.user[0] : m.user
+        })),
         totalTournaments: totalTournaments || 0,
         completedTournaments: completedTournaments || 0,
-        recentChampions: recentChampions || []
+        recentChampions: (recentChampions || []).map((c: any) => ({
+          ...c,
+          winner: Array.isArray(c.winner) ? c.winner[0] : c.winner
+        }))
       },
       error: null
     };

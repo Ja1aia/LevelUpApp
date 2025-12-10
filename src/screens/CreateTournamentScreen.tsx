@@ -61,13 +61,18 @@ export default function CreateTournamentScreen({
 
         setCreating(true);
         try {
+            // Default registration ends in 24 hours
+            const registrationEndsAt = new Date();
+            registrationEndsAt.setDate(registrationEndsAt.getDate() + 1);
+
             const { data, error } = await createTournament(
-                userId,
                 communityId,
+                userId,
                 name.trim(),
+                '', // description (empty for now)
                 format,
-                minParticipants,
-                maxParticipants
+                maxParticipants,
+                registrationEndsAt
             );
 
             if (error) throw error;

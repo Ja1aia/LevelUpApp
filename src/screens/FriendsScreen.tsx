@@ -311,7 +311,14 @@ export default function FriendsScreen({
             </View>
             <View style={styles.infoContainer}>
                 <Text style={styles.username}>{item.sender.username}</Text>
-                <Text style={styles.elo}>Challenged you!</Text>
+                <Text style={[
+                    styles.elo,
+                    // @ts-ignore - room type definition needs update but runtime works
+                    item.room?.tournament_match_id && { color: COLORS.primary, fontWeight: 'bold' }
+                ]}>
+                    {/* @ts-ignore */}
+                    {item.room?.tournament_match_id ? '🏆 Tournament Match!' : 'Challenged you!'}
+                </Text>
             </View>
             <View style={styles.actionButtons}>
                 <TouchableOpacity

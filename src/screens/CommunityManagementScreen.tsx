@@ -132,7 +132,7 @@ export default function CommunityManagementScreen({
     const handleApproveRequest = async (requestId: string, requesterId: string) => {
         setProcessing(requestId);
         try {
-            const { error } = await approveJoinRequest(requestId, requesterId, community.id);
+            const { error } = await approveJoinRequest(requestId, userId); // requestId, approverId
             if (error) throw error;
 
             Alert.alert('Success', 'Join request approved');
@@ -147,7 +147,7 @@ export default function CommunityManagementScreen({
     const handleRejectRequest = async (requestId: string) => {
         setProcessing(requestId);
         try {
-            const { error } = await rejectJoinRequest(requestId);
+            const { error } = await rejectJoinRequest(requestId, userId); // requestId, rejecterId
             if (error) throw error;
 
             await fetchData();
@@ -169,7 +169,7 @@ export default function CommunityManagementScreen({
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const { error } = await kickMember(userId, memberId, community.id);
+                            const { error } = await kickMember(memberId, userId); // membershipId, kickerId
                             if (error) throw error;
 
                             Alert.alert('Success', `${memberName} has been removed from the community`);
@@ -193,7 +193,7 @@ export default function CommunityManagementScreen({
                     text: 'Promote',
                     onPress: async () => {
                         try {
-                            const { error } = await promoteToCoLeader(userId, memberId, community.id);
+                            const { error } = await promoteToCoLeader(memberId, userId); // membershipId, leaderId
                             if (error) throw error;
 
                             Alert.alert('Success', `${memberName} is now a co-leader`);
@@ -218,7 +218,7 @@ export default function CommunityManagementScreen({
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const { error } = await demoteCoLeader(userId, memberId, community.id);
+                            const { error } = await demoteCoLeader(memberId, userId); // membershipId, leaderId
                             if (error) throw error;
 
                             Alert.alert('Success', `${memberName} is now a regular member`);
@@ -257,12 +257,14 @@ export default function CommunityManagementScreen({
         setProcessing('settings');
         try {
             const { error } = await updateCommunitySettings(
-                userId,
                 community.id,
-                editName.trim(),
-                editDescription.trim(),
-                maxMembersNum,
-                editVisibility
+                userId,
+                {
+                    name: editName.trim(),
+                    description: editDescription.trim(),
+                    max_members: maxMembersNum,
+                    visibility: editVisibility
+                }
             );
             if (error) throw error;
 
@@ -287,7 +289,7 @@ export default function CommunityManagementScreen({
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const { error } = await disbandCommunity(userId, community.id);
+                            const { error } = await disbandCommunity(community.id, userId); // communityId, userId
                             if (error) throw error;
 
                             Alert.alert('Community Disbanded', 'The community has been disbanded');
@@ -427,8 +429,8 @@ export default function CommunityManagementScreen({
                                             </View>
                                             <Text style={styles.visibilityText}>
                                                 {vis === 'open' ? '🌍 Open' :
-                                                 vis === 'invite_only' ? '🔒 Invite-Only' :
-                                                 '🚫 Closed'}
+                                                    vis === 'invite_only' ? '🔒 Invite-Only' :
+                                                        '🚫 Closed'}
                                             </Text>
                                         </TouchableOpacity>
                                     ))}
@@ -446,8 +448,8 @@ export default function CommunityManagementScreen({
                                 <Text style={styles.settingItem}>
                                     Visibility: {
                                         community.visibility === 'open' ? '🌍 Open' :
-                                        community.visibility === 'invite_only' ? '🔒 Invite-Only' :
-                                        '🚫 Closed'
+                                            community.visibility === 'invite_only' ? '🔒 Invite-Only' :
+                                                '🚫 Closed'
                                     }
                                 </Text>
                             </View>
@@ -501,7 +503,7 @@ export default function CommunityManagementScreen({
                         const isLeader = member.role === 'leader';
                         const isCoLeader = member.role === 'co_leader';
                         const canKick = (userRole === 'leader' && !isLeader) ||
-                                       (userRole === 'co_leader' && !isLeader && !isCoLeader);
+                            (userRole === 'co_leader' && !isLeader && !isCoLeader);
                         const canPromote = userRole === 'leader' && !isLeader && !isCoLeader;
                         const canDemote = userRole === 'leader' && isCoLeader;
 
