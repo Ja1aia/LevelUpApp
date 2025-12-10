@@ -1,12 +1,48 @@
 /**
  * ELO Rating System
- * Based on the official chess ELO calculation
+ * Based on the official chess ELO calculation with adaptive K-factor
  */
 
 // K-factor determines how much ratings change
 // Higher K = more volatile ratings
-// Chess uses: 40 for new players, 20 for < 2400, 10 for > 2400
-const K_FACTOR = 32;
+// We use adaptive K-factor similar to Chess.com:
+// - High K-factor (64) for first 10 games (provisional period)
+// - Medium K-factor (40) for games 11-30 (stabilization period)
+// - Lower K-factor (24) for experienced players with rating < 2000
+// - Lowest K-factor (16) for highly rated players (>= 2000)
+const DEFAULT_K_FACTOR = 32;
+
+/**
+ * Calculate adaptive K-factor based on number of games played and rating
+ * This allows ratings to adjust quickly for new players and stabilize for experienced players
+ *
+ * @param gamesPlayed - Total number of games the player has played
+ * @param currentRating - Player's current ELO rating
+ * @returns Appropriate K-factor for the player
+ */
+export function getAdaptiveKFactor(
+  gamesPlayed: number,
+  currentRating: number
+): number {
+  // Provisional period: First 10 games - rating adjusts very quickly
+  if (gamesPlayed < 10) {
+    return 64;
+  }
+
+  // Stabilization period: Games 11-30 - rating still adjusts relatively quickly
+  if (gamesPlayed < 30) {
+    return 40;
+  }
+
+  // Experienced players: Rating adjusts based on skill level
+  // High-rated players (>= 2000) get lower K-factor for rating stability
+  if (currentRating >= 2000) {
+    return 16;
+  }
+
+  // Regular players: Standard K-factor
+  return 24;
+}
 
 /**
  * Calculate expected score based on rating difference
@@ -26,15 +62,18 @@ export function calculateExpectedScore(
  * @param currentRating - Player's current ELO rating
  * @param opponentRating - Opponent's ELO rating
  * @param actualScore - 1 for win, 0.5 for draw, 0 for loss
+ * @param gamesPlayed - Total number of games played (for adaptive K-factor)
  * @returns Object with new rating and change amount
  */
 export function calculateNewRating(
   currentRating: number,
   opponentRating: number,
-  actualScore: number // 1 = win, 0.5 = draw, 0 = loss
+  actualScore: number, // 1 = win, 0.5 = draw, 0 = loss
+  gamesPlayed: number = 30 // Default to experienced player if not provided
 ): { newRating: number; change: number } {
   const expectedScore = calculateExpectedScore(currentRating, opponentRating);
-  const change = Math.round(K_FACTOR * (actualScore - expectedScore));
+  const kFactor = getAdaptiveKFactor(gamesPlayed, currentRating);
+  const change = Math.round(kFactor * (actualScore - expectedScore));
   const newRating = currentRating + change;
 
   // Minimum rating is 100 to prevent negative ratings
@@ -51,7 +90,9 @@ export function calculateMatchEloChanges(
   player1Rating: number,
   player2Rating: number,
   player1Score: number,
-  player2Score: number
+  player2Score: number,
+  player1GamesPlayed: number = 30,
+  player2GamesPlayed: number = 30
 ): {
   player1Change: number;
   player2Change: number;
@@ -76,13 +117,15 @@ export function calculateMatchEloChanges(
   const player1Result = calculateNewRating(
     player1Rating,
     player2Rating,
-    player1ActualScore
+    player1ActualScore,
+    player1GamesPlayed
   );
 
   const player2Result = calculateNewRating(
     player2Rating,
     player1Rating,
-    player2ActualScore
+    player2ActualScore,
+    player2GamesPlayed
   );
 
   return {

@@ -339,6 +339,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         options: {
           redirectTo: redirectUrl,
           skipBrowserRedirect: Platform.OS === 'web' ? false : true,
+          queryParams: {
+            prompt: 'select_account', // Force account selection every time
+            access_type: 'offline',
+          },
         },
       });
 
@@ -348,15 +352,22 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         setLoading(false);
         return;
       }
-
       console.log('Supabase Auth URL generated:', data.url);
 
       if (data.url) {
-        console.log('Opening OAuth URL in browser...');
+        let authUrl = data.url;
+        // Force prompt=consent to ensure account selection
+        if (authUrl.includes('prompt=')) {
+          authUrl = authUrl.replace(/prompt=[^&]+/, 'prompt=consent');
+        } else {
+          authUrl += '&prompt=consent';
+        }
+
+        console.log('Final OAuth URL:', authUrl);
         console.log('Waiting for redirect to:', redirectUrl);
 
         const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
+          authUrl,
           redirectUrl
         );
 

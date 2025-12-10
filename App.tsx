@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, ActivityIndicator, View, Alert } from 'react-native';
+import { StyleSheet, ActivityIndicator, View, Alert, Platform } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
 import LoginScreen from './src/screens/LoginScreen';
 import LobbyScreen from './src/screens/LobbyScreen';
 import WaitingForPlayerScreen from './src/screens/WaitingForPlayerScreen';
@@ -158,13 +159,22 @@ export default function App() {
     try {
       console.log('App: Logging out...');
 
-      // Sign out from Supabase
-      await supabase.auth.signOut();
+      // 1. Sign out from Supabase with global scope
+      await supabase.auth.signOut({ scope: 'global' });
 
-      // Clear ALL AsyncStorage data
-      await AsyncStorage.multiRemove(['userId', 'username']);
+      // 2. Clear ALL AsyncStorage data (including Supabase storage keys)
+      const allKeys = await AsyncStorage.getAllKeys();
+      await AsyncStorage.multiRemove(allKeys);
+      console.log('Cleared AsyncStorage keys:', allKeys);
 
-      // Reset all state
+      // 3. Clear WebBrowser cookies/cache (important for Google OAuth)
+      try {
+        await WebBrowser.maybeCompleteAuthSession();
+      } catch (e) {
+        console.log('WebBrowser cleanup (non-critical):', e);
+      }
+
+      // 4. Reset all state
       setUsername('');
       setUserId('');
       setUserElo(1000);
@@ -174,7 +184,18 @@ export default function App() {
       setQuestions([]);
       setCurrentScreen('home');
 
-      console.log('App: Logged out successfully');
+      console.log('App: Logged out successfully - all sessions cleared');
+
+      // 5. For Web: Force page reload to clear all cached state
+      if (Platform.OS === 'web') {
+        console.log('Web platform detected - forcing page reload');
+        // Small delay to ensure state updates complete
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      } else {
+        Alert.alert('Logged Out', 'You have been successfully logged out.');
+      }
     } catch (error) {
       console.error('Error signing out:', error);
       // Force clear even if error
@@ -182,6 +203,13 @@ export default function App() {
       setUsername('');
       setUserId('');
       setCurrentScreen('home');
+
+      // Force reload on web even on error
+      if (Platform.OS === 'web') {
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      }
     }
   };
 
