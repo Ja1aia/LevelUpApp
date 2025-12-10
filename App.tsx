@@ -16,11 +16,17 @@ import MatchDetailsScreen from './src/screens/MatchDetailsScreen';
 import PracticeModeScreen from './src/screens/PracticeModeScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
+import CommunityListScreen from './src/screens/CommunityListScreen';
+import CreateCommunityScreen from './src/screens/CreateCommunityScreen';
+import CommunityHubScreen from './src/screens/CommunityHubScreen';
+import CommunityManagementScreen from './src/screens/CommunityManagementScreen';
+import CreateTournamentScreen from './src/screens/CreateTournamentScreen';
+import TournamentViewScreen from './src/screens/TournamentViewScreen';
 import { Answer, Question } from './src/types';
 import { supabase } from './src/lib/supabase';
 import { COLORS } from './src/theme/colors';
 
-type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails' | 'practice' | 'friends' | 'leaderboard';
+type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails' | 'practice' | 'friends' | 'leaderboard' | 'communityList' | 'createCommunity' | 'communityHub' | 'communityManagement' | 'createTournament' | 'tournamentView';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -32,6 +38,9 @@ export default function App() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState('');
+  const [selectedCommunityId, setSelectedCommunityId] = useState('');
+  const [selectedCommunityName, setSelectedCommunityName] = useState('');
+  const [selectedTournamentId, setSelectedTournamentId] = useState('');
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // Check for existing session on app start
@@ -246,6 +255,7 @@ export default function App() {
             onViewMatchHistory={() => setCurrentScreen('matchHistory')}
             onPracticeMode={() => setCurrentScreen('practice')}
             onViewFriends={() => setCurrentScreen('friends')}
+            onViewCommunity={() => setCurrentScreen('communityList')}
             onViewLeaderboard={() => setCurrentScreen('leaderboard')}
             onLogout={handleLogout}
           />
@@ -345,6 +355,68 @@ export default function App() {
           <LeaderboardScreen
             userId={userId}
             onBack={() => setCurrentScreen('lobby')}
+          />
+        )}
+
+        {currentScreen === 'communityList' && (
+          <CommunityListScreen
+            userId={userId}
+            onBack={() => setCurrentScreen('lobby')}
+            onCreateCommunity={() => setCurrentScreen('createCommunity')}
+            onViewCommunityHub={() => setCurrentScreen('communityHub')}
+          />
+        )}
+
+        {currentScreen === 'createCommunity' && (
+          <CreateCommunityScreen
+            userId={userId}
+            onBack={() => setCurrentScreen('communityList')}
+            onCommunityCreated={() => setCurrentScreen('communityHub')}
+          />
+        )}
+
+        {currentScreen === 'communityHub' && (
+          <CommunityHubScreen
+            userId={userId}
+            username={username}
+            onBack={() => setCurrentScreen('lobby')}
+            onManageCommunity={() => setCurrentScreen('communityManagement')}
+            onCreateTournament={(communityId, communityName) => {
+              setSelectedCommunityId(communityId);
+              setSelectedCommunityName(communityName);
+              setCurrentScreen('createTournament');
+            }}
+            onViewTournament={(tournamentId) => {
+              setSelectedTournamentId(tournamentId);
+              setCurrentScreen('tournamentView');
+            }}
+            onRoomCreated={handleRoomCreated}
+          />
+        )}
+
+        {currentScreen === 'communityManagement' && (
+          <CommunityManagementScreen
+            userId={userId}
+            onBack={() => setCurrentScreen('communityHub')}
+          />
+        )}
+
+        {currentScreen === 'createTournament' && (
+          <CreateTournamentScreen
+            userId={userId}
+            communityId={selectedCommunityId}
+            communityName={selectedCommunityName}
+            onBack={() => setCurrentScreen('communityHub')}
+            onTournamentCreated={() => setCurrentScreen('communityHub')}
+          />
+        )}
+
+        {currentScreen === 'tournamentView' && (
+          <TournamentViewScreen
+            userId={userId}
+            tournamentId={selectedTournamentId}
+            onBack={() => setCurrentScreen('communityHub')}
+            onMatchRoomCreated={handleRoomCreated}
           />
         )}
       </SafeAreaView>

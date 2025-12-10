@@ -27,6 +27,7 @@ interface LobbyScreenProps {
   onViewMatchHistory: () => void;
   onPracticeMode: () => void;
   onViewFriends: () => void;
+  onViewCommunity: () => void;
   onViewLeaderboard: () => void;
   onLogout: () => void;
 }
@@ -38,6 +39,7 @@ export default function LobbyScreen({
   onRoomCreated,
   onRoomJoined,
   onViewProfile,
+  onViewCommunity,
   onViewMatchHistory,
   onPracticeMode,
   onViewFriends,
@@ -179,6 +181,19 @@ export default function LobbyScreen({
                     activeOpacity={0.7}
                   >
                     <Text style={styles.dropdownText}>👥 Friends</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.dropdownDivider} />
+
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setMenuVisible(false);
+                      onViewCommunity();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.dropdownText}>🏛️ Community</Text>
                   </TouchableOpacity>
 
                   <View style={styles.dropdownDivider} />

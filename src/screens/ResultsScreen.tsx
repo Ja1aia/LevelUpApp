@@ -10,6 +10,7 @@ import {
 import { COLORS } from '../theme/colors';
 import { Answer, Question } from '../types';
 import { supabase } from '../lib/supabase';
+import { linkGameResultToMatch } from '../services/database';
 
 interface ResultsScreenProps {
   username: string;
@@ -153,7 +154,7 @@ export default function ResultsScreen({
           while (attempts < maxAttempts) {
             const { data: gameResult } = await supabase
               .from('game_results')
-              .select('player1_elo_change, player2_elo_change')
+              .select('id, player1_elo_change, player2_elo_change')
               .eq('room_id', roomId)
               .single();
 
@@ -168,6 +169,15 @@ export default function ResultsScreen({
               } else {
                 setYourEloChange(gameResult.player2_elo_change);
                 setOpponentEloChange(gameResult.player1_elo_change);
+              }
+
+              // Link to tournament match if this is a tournament game
+              try {
+                await linkGameResultToMatch(roomId, gameResult.id);
+                console.log('✅ Linked tournament match result');
+              } catch (error) {
+                console.error('Tournament match linking error:', error);
+                // Don't fail the results screen if this fails
               }
 
               break;
