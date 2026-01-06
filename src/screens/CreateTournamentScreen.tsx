@@ -143,26 +143,7 @@ export default function CreateTournamentScreen({
                         </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[
-                            styles.formatOption,
-                            format === 'double_elimination' && styles.formatOptionSelected,
-                            styles.disabledOption
-                        ]}
-                        disabled
-                    >
-                        <View style={styles.radioOuter}>
-                            {format === 'double_elimination' && <View style={styles.radioInner} />}
-                        </View>
-                        <View style={styles.formatContent}>
-                            <Text style={[styles.formatTitle, styles.disabledText]}>
-                                🔄 Double Elimination (Coming Soon)
-                            </Text>
-                            <Text style={[styles.formatDescription, styles.disabledText]}>
-                                Two chances - winners and losers brackets.
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
+            
                 </View>
 
                 {/* Participant Limits */}

@@ -336,7 +336,7 @@ export default function CommunityHubScreen({
                         {isProcessing ? (
                             <ActivityIndicator color="white" size="small" />
                         ) : (
-                            <Text style={styles.tournamentButtonText}>
+                            <Text style={item.is_registered ? styles.unregisterButtonText : styles.tournamentButtonText}>
                                 {isFull && !item.is_registered ? 'Full' :
                                     item.is_registered ? 'Unregister' : 'Register'}
                             </Text>
@@ -920,6 +920,11 @@ const styles = StyleSheet.create({
     },
     tournamentButtonText: {
         color: 'white',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    unregisterButtonText: {
+        color: '#666',
         fontWeight: 'bold',
         fontSize: 14,
     },

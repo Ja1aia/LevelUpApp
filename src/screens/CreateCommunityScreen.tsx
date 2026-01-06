@@ -202,26 +202,7 @@ export default function CreateCommunityScreen({
                         </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[
-                            styles.visibilityOption,
-                            visibility === 'closed' && styles.visibilityOptionSelected
-                        ]}
-                        onPress={() => setVisibility('closed')}
-                    >
-                        <View style={styles.radioOuter}>
-                            {visibility === 'closed' && <View style={styles.radioInner} />}
-                        </View>
-                        <View style={styles.visibilityContent}>
-                            <View style={styles.visibilityHeader}>
-                                <Text style={styles.visibilityIcon}>🚫</Text>
-                                <Text style={styles.visibilityTitle}>Closed</Text>
-                            </View>
-                            <Text style={styles.visibilityDescription}>
-                                Hidden from browse. Members can only join via direct invitation.
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
+                    {/* Closed option removed - can only be set after creation via edit */}
                 </View>
 
                 {/* Create Button */}

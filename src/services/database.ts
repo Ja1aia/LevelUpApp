@@ -256,6 +256,98 @@ export async function updateRoomStatus(
   }
 }
 
+// ==================== MATCHMAKING ====================
+
+/**
+ * Join matchmaking queue
+ */
+export async function joinMatchmakingQueue(userId: string, userElo: number) {
+  try {
+    // Insert user into matchmaking queue
+    const { data, error } = await supabase
+      .from('matchmaking_queue')
+      .insert({
+        user_id: userId,
+        elo: userElo,
+        status: 'searching'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      // If error is due to unique constraint (user already in queue), that's ok
+      if (error.code === '23505') {
+        return { data: null, error: new Error('You are already in the matchmaking queue') };
+      }
+      throw error;
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    console.error('joinMatchmakingQueue error:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Leave matchmaking queue
+ */
+export async function leaveMatchmakingQueue(userId: string) {
+  try {
+    const { error } = await supabase
+      .from('matchmaking_queue')
+      .delete()
+      .eq('user_id', userId);
+
+    return { error };
+  } catch (error) {
+    console.error('leaveMatchmakingQueue error:', error);
+    return { error };
+  }
+}
+
+/**
+ * Check for match
+ * This function calls the database function to find and create a match
+ */
+export async function checkForMatch(userId: string, userElo: number) {
+  try {
+    const { data, error } = await supabase
+      .rpc('find_match', {
+        p_user_id: userId,
+        p_user_elo: userElo
+      });
+
+    if (error) throw error;
+
+    // data is an array with one row
+    const result = data && data.length > 0 ? data[0] : null;
+
+    return { data: result, error: null };
+  } catch (error) {
+    console.error('checkForMatch error:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Get user's queue status
+ */
+export async function getMatchmakingStatus(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('matchmaking_queue')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    return { data, error };
+  } catch (error) {
+    console.error('getMatchmakingStatus error:', error);
+    return { data: null, error };
+  }
+}
+
 // ==================== STATS ====================
 
 /**
