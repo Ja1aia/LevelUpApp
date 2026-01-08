@@ -101,10 +101,10 @@ export default function LeaderboardScreen({ userId, onBack }: LeaderboardScreenP
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
+                    <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
-                <Text style={styles.title}>Leaderboard</Text>
-                <View style={{ width: 40 }} />
+                <Text style={styles.headerTitle}>Leaderboard</Text>
+                <View style={styles.headerSpacer} />
             </View>
 
             <View style={styles.content}>
@@ -144,25 +144,30 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-        backgroundColor: '#FFFFFF',
+        paddingTop: 16,
+        paddingBottom: 12,
+        backgroundColor: COLORS.background,
     },
     backButton: {
-        padding: 8,
-        width: 40,
-        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     backButtonText: {
-        fontSize: 24,
-        color: '#1A1A1A',
-        fontWeight: 'bold',
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
     },
-    title: {
+    headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#1A1A1A',
+        color: COLORS.textPrimary,
+    },
+    headerSpacer: {
+        width: 60,
     },
     content: {
         flex: 1,

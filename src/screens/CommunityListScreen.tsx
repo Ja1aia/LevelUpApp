@@ -382,9 +382,9 @@ export default function CommunityListScreen({
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backText}>←</Text>
+                    <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
-                <Text style={styles.title}>Communities</Text>
+                <Text style={styles.headerTitle}>Communities</Text>
                 <TouchableOpacity
                     onPress={onCreateCommunity}
                     style={styles.createButton}
@@ -503,24 +503,28 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 16,
         paddingTop: 16,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
-        backgroundColor: 'white',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
+        paddingBottom: 12,
+        backgroundColor: COLORS.background,
     },
     backButton: {
-        padding: 8,
+        backgroundColor: COLORS.white,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
-    backText: {
-        fontSize: 28,
-        color: COLORS.primary,
+    backButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
     },
-    title: {
-        fontSize: 24,
+    headerTitle: {
+        fontSize: 20,
         fontWeight: 'bold',
-        color: '#333',
+        color: COLORS.textPrimary,
     },
     createButton: {
         backgroundColor: COLORS.primary,

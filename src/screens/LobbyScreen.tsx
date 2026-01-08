@@ -23,6 +23,7 @@ interface LobbyScreenProps {
   userElo: number;
   onRoomCreated: (roomId: string, roomCode: string) => void;
   onRoomJoined: (roomId: string, roomCode: string) => void;
+  onMatchmakingStart: () => void;
   onViewProfile: () => void;
   onViewMatchHistory: () => void;
   onPracticeMode: () => void;
@@ -38,6 +39,7 @@ export default function LobbyScreen({
   userElo,
   onRoomCreated,
   onRoomJoined,
+  onMatchmakingStart,
   onViewProfile,
   onViewCommunity,
   onViewMatchHistory,
@@ -270,6 +272,22 @@ export default function LobbyScreen({
             </View>
           </TouchableOpacity>
 
+          {/* Find Opponent Button - FEATURED */}
+          <TouchableOpacity
+            style={styles.findOpponentButton}
+            onPress={onMatchmakingStart}
+            activeOpacity={0.8}
+          >
+            <View style={styles.findOpponentIcon}>
+              <Text style={styles.findOpponentIconText}>⚔️</Text>
+            </View>
+            <View style={styles.findOpponentContent}>
+              <Text style={styles.findOpponentTitle}>FIND OPPONENT</Text>
+              <Text style={styles.findOpponentSubtitle}>Auto-match with similar skill</Text>
+            </View>
+            <Text style={styles.findOpponentArrow}>›</Text>
+          </TouchableOpacity>
+
           {/* Create Room Section */}
           <View style={styles.section}>
             <TouchableOpacity
@@ -481,6 +499,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
     color: '#1A1A1A',
+  },
+  findOpponentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    padding: 20,
+    marginVertical: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  findOpponentIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  findOpponentIconText: {
+    fontSize: 24,
+  },
+  findOpponentContent: {
+    flex: 1,
+  },
+  findOpponentTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  findOpponentSubtitle: {
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  findOpponentArrow: {
+    fontSize: 32,
+    color: '#1A1A1A',
+    fontWeight: 'bold',
   },
   section: {
     marginBottom: 24,

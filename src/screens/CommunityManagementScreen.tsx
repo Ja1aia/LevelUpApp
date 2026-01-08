@@ -316,10 +316,10 @@ export default function CommunityManagementScreen({
             <View style={styles.container}>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                        <Text style={styles.backText}>←</Text>
+                        <Text style={styles.backButtonText}>Back</Text>
                     </TouchableOpacity>
-                    <Text style={styles.title}>Manage Community</Text>
-                    <View style={{ width: 40 }} />
+                    <Text style={styles.headerTitle}>Manage Community</Text>
+                    <View style={styles.headerSpacer} />
                 </View>
                 <View style={styles.centerContainer}>
                     <Text style={styles.errorText}>Community not found</Text>
@@ -333,10 +333,10 @@ export default function CommunityManagementScreen({
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backText}>←</Text>
+                    <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
-                <Text style={styles.title}>Manage Community</Text>
-                <View style={{ width: 40 }} />
+                <Text style={styles.headerTitle}>Manage Community</Text>
+                <View style={styles.headerSpacer} />
             </View>
 
             <ScrollView
@@ -604,16 +604,25 @@ const styles = StyleSheet.create({
         borderBottomColor: '#E0E0E0',
     },
     backButton: {
-        padding: 8,
+        backgroundColor: COLORS.white,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
-    backText: {
-        fontSize: 28,
-        color: COLORS.primary,
+    backButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
     },
-    title: {
-        fontSize: 24,
+    headerTitle: {
+        fontSize: 20,
         fontWeight: 'bold',
-        color: '#333',
+        color: COLORS.textPrimary,
+    },
+    headerSpacer: {
+        width: 60,
     },
     content: {
         flex: 1,
