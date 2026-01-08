@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import LoginScreen from './src/screens/LoginScreen';
 import LobbyScreen from './src/screens/LobbyScreen';
+import MatchmakingScreen from './src/screens/MatchmakingScreen';
 import WaitingForPlayerScreen from './src/screens/WaitingForPlayerScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import WaitingForOpponentScreen from './src/screens/WaitingForOpponentScreen';
@@ -26,7 +27,7 @@ import { Answer, Question } from './src/types';
 import { supabase } from './src/lib/supabase';
 import { COLORS } from './src/theme/colors';
 
-type Screen = 'home' | 'lobby' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails' | 'practice' | 'friends' | 'leaderboard' | 'communityList' | 'createCommunity' | 'communityHub' | 'communityManagement' | 'createTournament' | 'tournamentView';
+type Screen = 'home' | 'lobby' | 'matchmaking' | 'waitingForPlayer' | 'quiz' | 'waitingForOpponent' | 'results' | 'profile' | 'matchHistory' | 'matchDetails' | 'practice' | 'friends' | 'leaderboard' | 'communityList' | 'createCommunity' | 'communityHub' | 'communityManagement' | 'createTournament' | 'tournamentView';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -61,21 +62,17 @@ export default function App() {
         setUserElo(data.elo || 1000);
       }
     } catch (error) {
-      console.error('Error fetching user ELO:', error);
+      // Silent error handling
     }
   };
 
   const checkExistingSession = async () => {
     try {
-      console.log('App: Checking for existing session...');
-
       // First try to get stored user data from AsyncStorage (offline-first)
       const storedUserId = await AsyncStorage.getItem('userId');
       const storedUsername = await AsyncStorage.getItem('username');
 
       if (storedUserId && storedUsername) {
-        console.log('App: Found stored credentials, checking session...');
-
         try {
           // Check Supabase session with timeout
           const timeoutPromise = new Promise((_, reject) =>
@@ -91,33 +88,27 @@ export default function App() {
 
           if (session?.user) {
             // Valid session + stored data = auto-login
-            console.log('App: Auto-login with valid session:', storedUsername);
             setUserId(storedUserId);
             setUsername(storedUsername);
             await fetchUserElo(storedUserId);
             setCurrentScreen('lobby');
           } else {
             // No session but have stored data - clear it
-            console.log('App: Session expired, clearing stored data');
             await AsyncStorage.multiRemove(['userId', 'username']);
           }
         } catch (error) {
           // Network error or timeout - don't auto-login to allow account switching
-          console.log('App: Network error, clearing cached credentials');
           await AsyncStorage.multiRemove(['userId', 'username']);
         }
-      } else {
-        console.log('App: No stored credentials found');
       }
     } catch (error) {
-      console.error('App: Error checking session:', error);
+      // Silent error handling
     } finally {
       setIsCheckingAuth(false);
     }
   };
 
   const handleStartQuiz = async (id: string, name: string) => {
-    console.log('handleStartQuiz - userId:', id, 'username:', name);
     setUsername(name);
     setUserId(id);
     await fetchUserElo(id);
@@ -166,21 +157,18 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      console.log('App: Logging out...');
-
       // 1. Sign out from Supabase with global scope
       await supabase.auth.signOut({ scope: 'global' });
 
       // 2. Clear ALL AsyncStorage data (including Supabase storage keys)
       const allKeys = await AsyncStorage.getAllKeys();
       await AsyncStorage.multiRemove(allKeys);
-      console.log('Cleared AsyncStorage keys:', allKeys);
 
       // 3. Clear WebBrowser cookies/cache (important for Google OAuth)
       try {
         await WebBrowser.maybeCompleteAuthSession();
       } catch (e) {
-        console.log('WebBrowser cleanup (non-critical):', e);
+        // Silent error handling
       }
 
       // 4. Reset all state
@@ -193,11 +181,8 @@ export default function App() {
       setQuestions([]);
       setCurrentScreen('home');
 
-      console.log('App: Logged out successfully - all sessions cleared');
-
       // 5. For Web: Force page reload to clear all cached state
       if (Platform.OS === 'web') {
-        console.log('Web platform detected - forcing page reload');
         // Small delay to ensure state updates complete
         setTimeout(() => {
           window.location.reload();
@@ -206,7 +191,6 @@ export default function App() {
         Alert.alert('Logged Out', 'You have been successfully logged out.');
       }
     } catch (error) {
-      console.error('Error signing out:', error);
       // Force clear even if error
       await AsyncStorage.clear();
       setUsername('');
@@ -251,6 +235,7 @@ export default function App() {
             userElo={userElo}
             onRoomCreated={handleRoomCreated}
             onRoomJoined={handleRoomJoined}
+            onMatchmakingStart={() => setCurrentScreen('matchmaking')}
             onViewProfile={() => setCurrentScreen('profile')}
             onViewMatchHistory={() => setCurrentScreen('matchHistory')}
             onPracticeMode={() => setCurrentScreen('practice')}
@@ -258,6 +243,16 @@ export default function App() {
             onViewCommunity={() => setCurrentScreen('communityList')}
             onViewLeaderboard={() => setCurrentScreen('leaderboard')}
             onLogout={handleLogout}
+          />
+        )}
+
+        {currentScreen === 'matchmaking' && (
+          <MatchmakingScreen
+            userId={userId}
+            username={username}
+            userElo={userElo}
+            onMatchFound={handleRoomJoined}
+            onCancel={() => setCurrentScreen('lobby')}
           />
         )}
 

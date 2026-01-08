@@ -32,8 +32,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
   // Handle deep linking for OAuth callback
   const handleUrl = async (event: { url: string }) => {
-    console.log('Deep link received:', event.url);
-
     // Check if this is an OAuth callback
     if (event.url.includes('#access_token=') || event.url.includes('?access_token=')) {
       setVerifying(true);
@@ -50,37 +48,25 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         const refreshToken = params.get('refresh_token');
         const type = params.get('type');
 
-        console.log('Parsed tokens:', {
-          hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken,
-          type
-        });
-
         if (accessToken) {
-          console.log('Access token found, setting session...');
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken || '',
           });
 
           if (error) {
-            console.error('Session error:', error);
             Alert.alert('Authentication Failed', error.message);
             setVerifying(false);
           } else if (data.user) {
-            console.log('Session set successfully for user:', data.user.id);
             // handleSuccessfulAuth will handle the rest
             await handleSuccessfulAuth(data.user.id);
           } else {
-            console.log('Session set but no user data returned');
             setVerifying(false);
           }
         } else {
-          console.log('No access token found in URL');
           setVerifying(false);
         }
       } catch (error: any) {
-        console.error('Error parsing OAuth callback:', error);
         Alert.alert('Authentication Failed', error.message);
         setVerifying(false);
       }
@@ -90,7 +76,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const checkExistingSession = async () => {
     // Don't check if auth is already in progress
     if (isAuthInProgress.current) {
-      console.log('checkExistingSession skipped - auth already in progress');
       return;
     }
 
@@ -98,11 +83,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user) {
-        console.log('Existing session found:', session.user.id);
         await handleSuccessfulAuth(session.user.id);
       }
     } catch (error) {
-      console.error('Error checking session:', error);
+      // Silent error handling
     }
   };
 
@@ -113,7 +97,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     // Listen for AppState changes (background -> foreground)
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
-        console.log('App came to foreground, checking session...');
         checkExistingSession();
       }
     });
@@ -121,11 +104,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth event:', event, session?.user?.id);
-
         // Only handle SIGNED_IN if auth is not already in progress
         if (event === 'SIGNED_IN' && session?.user && !isAuthInProgress.current) {
-          console.log('SIGNED_IN event received, handling auth...');
           await handleSuccessfulAuth(session.user.id);
         }
       }
@@ -133,14 +113,12 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
     // Subscribe to URL events
     const urlSubscription = Linking.addEventListener('url', (event: { url: string }) => {
-      console.log('Linking event received:', event.url);
       handleUrl(event);
     });
 
     // Check initial URL (in case app was opened via deep link)
     Linking.getInitialURL().then((url) => {
       if (url) {
-        console.log('Initial URL found:', url);
         handleUrl({ url });
       }
     });
@@ -159,18 +137,14 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const handleSuccessfulAuth = async (userId: string) => {
     // Check if already in progress
     if (isAuthInProgress.current) {
-      console.log('Auth already in progress for:', userId, 'skipping...');
       return;
     }
 
     // Set flag immediately
     isAuthInProgress.current = true;
     setVerifying(true);
-    console.log('handleSuccessfulAuth called for:', userId);
 
     try {
-      console.log('Checking if user exists in DB...');
-      console.log('Supabase URL:', process.env.EXPO_PUBLIC_SUPABASE_URL);
 
       // Increased timeout to 60 seconds as requested
       const timeoutPromise = new Promise((_, reject) =>
@@ -178,11 +152,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       );
 
       const dbQueryPromise = (async () => {
-        console.log('Starting DB query for userId:', userId);
-
         const { data: { session } } = await supabase.auth.getSession();
-        console.log('Current session user:', session?.user?.id);
-        console.log('Session access token exists:', !!session?.access_token);
 
         if (!session) {
           throw new Error('No active session found');
@@ -191,14 +161,12 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         // Small delay for session propagation
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const startTime = Date.now();
         const result = await supabase
           .from('users')
           .select('id, username')
           .eq('id', userId)
           .single();
 
-        console.log(`DB query completed in ${Date.now() - startTime}ms`);
         return result;
       })();
 
@@ -207,18 +175,13 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         timeoutPromise
       ]) as any;
 
-      console.log('Query finished. userData:', userData, 'fetchError:', fetchError);
-
       if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching user:', fetchError);
         throw new Error(`Database error: ${fetchError.message}`);
       }
 
       if (userData) {
         // Existing user - call onLoginSuccess and DON'T reset isAuthInProgress
         // The component will unmount/navigate away, so we don't need to reset it
-        console.log('Existing user found:', userData.username);
-        console.log('Calling onLoginSuccess with userId:', userData.id, 'username:', userData.username);
 
         // Save user data to AsyncStorage for auto-login
         await AsyncStorage.setItem('userId', userData.id);
@@ -229,7 +192,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         return;
       } else {
         // New user - create profile
-        console.log('Creating new user profile...');
         const { data: userAuth } = await supabase.auth.getUser();
 
         const userMetadata = userAuth.user?.user_metadata;
@@ -239,11 +201,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           userAuth.user?.email?.split('@')[0] ||
           'User';
 
-        console.log('Inserting new user:', username);
-        console.log('User metadata:', userMetadata);
-
         const insertPromise = (async () => {
-          console.log('Starting user insert...');
           const result = await supabase
             .from('users')
             .insert({
@@ -258,7 +216,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             .select()
             .single();
 
-          console.log('Insert completed. Result:', result);
           return result;
         })();
 
@@ -271,7 +228,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         if (insertError) {
           if (insertError.code === '23505') {
-            console.log('User already created (race condition), fetching profile...');
             const { data: existingUser } = await supabase
               .from('users')
               .select('id, username')
@@ -288,12 +244,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             }
           }
 
-          console.error('Error creating user:', insertError);
           throw new Error(`Failed to create profile: ${insertError.message}`);
         }
 
         if (newUser) {
-          console.log('New user created:', newUser.username);
 
           // Save user data to AsyncStorage
           await AsyncStorage.setItem('userId', newUser.id);
@@ -304,7 +258,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         }
       }
     } catch (error: any) {
-      console.error('Error handling auth:', error);
       // ONLY reset isAuthInProgress on error so user can retry
       isAuthInProgress.current = false;
       setVerifying(false);
@@ -331,9 +284,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
       const redirectUrl = Linking.createURL('/auth');
 
-      console.log('Starting OAuth with redirect:', redirectUrl);
-      console.log('IMPORTANT: Ensure this URL is added to your Supabase Redirect URLs!');
-
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -347,12 +297,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       });
 
       if (error) {
-        console.error('OAuth initiation error:', error);
         Alert.alert('Login Failed', error.message);
         setLoading(false);
         return;
       }
-      console.log('Supabase Auth URL generated:', data.url);
 
       if (data.url) {
         let authUrl = data.url;
@@ -363,28 +311,20 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           authUrl += '&prompt=consent';
         }
 
-        console.log('Final OAuth URL:', authUrl);
-        console.log('Waiting for redirect to:', redirectUrl);
-
         const result = await WebBrowser.openAuthSessionAsync(
           authUrl,
           redirectUrl
         );
 
-        console.log('Browser result:', result);
-
         if (result.type === 'success' && result.url) {
-          console.log('Success! Handling redirect URL:', result.url);
           await handleUrl({ url: result.url });
         } else if (result.type === 'dismiss') {
-          console.log('User dismissed the browser');
           setLoading(false);
         }
       } else {
         setLoading(false);
       }
     } catch (error: any) {
-      console.error('Google Sign In Error:', error);
       Alert.alert(
         'Login Failed',
         error.message || 'Failed to sign in with Google'
@@ -465,22 +405,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <Text style={styles.privacyText}>
             By signing in, you agree to our Terms of Service and Privacy Policy
           </Text>
-
-          {/* Debug Info */}
-          <View style={styles.debugContainer}>
-            <Text style={styles.debugTitle}>Debug Info (Add to Supabase):</Text>
-            <Text selectable style={styles.debugText}>
-              {Linking.createURL('/auth')}
-            </Text>
-            <TouchableOpacity
-              style={{ marginTop: 8, padding: 4, backgroundColor: '#ddd', borderRadius: 4, alignSelf: 'flex-start' }}
-              onPress={() => {
-                Alert.alert('Copied!', 'URL copied to clipboard. Send this to your computer to add to Supabase.');
-              }}
-            >
-              <Text style={{ fontSize: 10 }}>Tap text above to copy</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* Features */}
@@ -610,24 +534,5 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     fontWeight: '500',
-  },
-  debugContainer: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  debugTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 4,
-  },
-  debugText: {
-    fontSize: 10,
-    color: '#333',
-    fontFamily: 'monospace',
   },
 });
