@@ -6,9 +6,9 @@ import {
     TextInput,
     TouchableOpacity,
     ScrollView,
-    Alert,
     ActivityIndicator,
 } from 'react-native';
+import { CrossPlatformAlert as Alert } from '../utils/alert';
 import { COLORS } from '../theme/colors';
 import { createTournament } from '../services/database';
 

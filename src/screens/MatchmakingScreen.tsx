@@ -5,9 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Animated,
 } from 'react-native';
+import { CrossPlatformAlert as Alert } from '../utils/alert';
 import { COLORS } from '../theme/colors';
 import {
   joinMatchmakingQueue,

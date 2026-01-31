@@ -55,3 +55,4 @@ Thumbs.db
 # generated native folders
 /ios
 /android
+.vercel

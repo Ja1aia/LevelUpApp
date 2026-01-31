@@ -21,8 +21,6 @@ export default function PlayerCard({
   avatar = '😊',
   style,
 }: PlayerCardProps) {
-  console.log('PlayerCard - Username:', username, 'ELO:', elo);
-
   return (
     <View style={[styles.container, isYou && styles.containerHighlight, style]}>
       {/* Avatar */}
@@ -32,7 +30,7 @@ export default function PlayerCard({
 
       {/* Player Info */}
       <View style={styles.infoContainer}>
-        <Text style={styles.username} testID="player-username">
+        <Text style={styles.username} numberOfLines={1} ellipsizeMode="tail">
           {username && username.trim() !== '' ? username : 'Player'}
         </Text>
         <Text style={styles.elo}>{elo} ELO</Text>
@@ -49,12 +47,12 @@ export default function PlayerCard({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
     borderRadius: 12,
-    padding: 12,
+    height: 68,
+    paddingHorizontal: 12,
     borderWidth: 2,
     borderColor: COLORS.border,
     shadowColor: COLORS.shadow,
@@ -62,34 +60,35 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    overflow: 'hidden',
   },
   containerHighlight: {
     borderColor: COLORS.primary,
     borderWidth: 3,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
+    flexShrink: 0,
   },
   avatarText: {
-    fontSize: 24,
+    fontSize: 22,
   },
   infoContainer: {
     flex: 1,
     justifyContent: 'center',
-    minWidth: 0, // Allow text to shrink
+    minWidth: 0,
   },
   username: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
     marginBottom: 2,
-    flexShrink: 1, // Allow text to wrap/shrink
   },
   elo: {
     fontSize: 12,
@@ -99,11 +98,13 @@ const styles = StyleSheet.create({
   scoreContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    marginLeft: 8,
+    flexShrink: 0,
   },
   scoreValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
   },
   scoreLabel: {
     fontSize: 14,

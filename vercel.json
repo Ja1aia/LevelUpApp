@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "buildCommand": "npx expo export -p web",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "EXPO_PUBLIC_SUPABASE_URL": "https://esqqdcjldpvtkndmcymc.supabase.co",
+    "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzcXFkY2psZHB2dGtuZG1jeW1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxODk4NzUsImV4cCI6MjA3ODc2NTg3NX0.jwCIlUdP5zZlb_5KUsScPd2AQBYFP_93X4FxC3CNPGg",
+    "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "697616766030-2kblcgrjff6tpdhehsvq6e0qlpturbn8.apps.googleusercontent.com"
+  }
+}

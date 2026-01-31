@@ -6,13 +6,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Keyboard,
   TouchableWithoutFeedback,
+  Modal,
+  Pressable,
 } from 'react-native';
+import { CrossPlatformAlert as Alert } from '../utils/alert';
 import { COLORS } from '../theme/colors';
 import { createRoom, joinRoom } from '../services/database';
 import { generateRoomCode, formatRoomCode, isValidRoomCode } from '../utils/roomCode';
@@ -135,7 +137,7 @@ export default function LobbyScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <TouchableWithoutFeedback onPress={Platform.OS === 'web' ? undefined : Keyboard.dismiss}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -153,103 +155,6 @@ export default function LobbyScreen({
             >
               <Text style={styles.menuIcon}>☰</Text>
             </TouchableOpacity>
-
-            {/* Dropdown Menu with TouchableWithoutFeedback */}
-            {menuVisible && (
-              <>
-                <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
-                  <View style={styles.menuOverlay} />
-                </TouchableWithoutFeedback>
-                <View style={styles.dropdown}>
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setMenuVisible(false);
-                      onViewLeaderboard();
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.dropdownText}>🏆 Leaderboard</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.dropdownDivider} />
-
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setMenuVisible(false);
-                      onViewFriends();
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.dropdownText}>👥 Friends</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.dropdownDivider} />
-
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setMenuVisible(false);
-                      onViewCommunity();
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.dropdownText}>🏛️ Community</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.dropdownDivider} />
-
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setMenuVisible(false);
-                      onPracticeMode();
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.dropdownText}>🎯 Practice Mode</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.dropdownDivider} />
-
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setMenuVisible(false);
-                      onViewMatchHistory();
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.dropdownText}>📜 Match History</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.dropdownDivider} />
-
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setMenuVisible(false);
-                      Alert.alert(
-                        'Logout',
-                        'Are you sure you want to logout?',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          {
-                            text: 'Logout',
-                            style: 'destructive',
-                            onPress: onLogout
-                          }
-                        ]
-                      );
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.dropdownText, { color: '#FF4444' }]}>🚪 Logout</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
           </View>
 
           {/* Header */}
@@ -353,6 +258,86 @@ export default function LobbyScreen({
 
         </ScrollView>
       </TouchableWithoutFeedback>
+
+      {/* Burger Menu Modal */}
+      <Modal
+        transparent
+        visible={menuVisible}
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuVisible(false)}>
+          <Pressable style={styles.dropdown} onPress={(e) => e.stopPropagation()}>
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => { setMenuVisible(false); onViewLeaderboard(); }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dropdownText}>🏆 Leaderboard</Text>
+            </TouchableOpacity>
+
+            <View style={styles.dropdownDivider} />
+
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => { setMenuVisible(false); onViewFriends(); }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dropdownText}>👥 Friends</Text>
+            </TouchableOpacity>
+
+            <View style={styles.dropdownDivider} />
+
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => { setMenuVisible(false); onViewCommunity(); }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dropdownText}>🏛️ Community</Text>
+            </TouchableOpacity>
+
+            <View style={styles.dropdownDivider} />
+
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => { setMenuVisible(false); onPracticeMode(); }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dropdownText}>🎯 Practice Mode</Text>
+            </TouchableOpacity>
+
+            <View style={styles.dropdownDivider} />
+
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => { setMenuVisible(false); onViewMatchHistory(); }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dropdownText}>📜 Match History</Text>
+            </TouchableOpacity>
+
+            <View style={styles.dropdownDivider} />
+
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => {
+                setMenuVisible(false);
+                Alert.alert(
+                  'Logout',
+                  'Are you sure you want to logout?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Logout', style: 'destructive', onPress: onLogout }
+                  ]
+                );
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dropdownText, { color: '#FF4444' }]}>🚪 Logout</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -401,17 +386,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   menuOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 70,
+    paddingRight: 16,
   },
   dropdown: {
-    position: 'absolute',
-    top: 50,
-    right: 16,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     shadowColor: '#000',
@@ -421,7 +403,6 @@ const styles = StyleSheet.create({
     elevation: 5,
     minWidth: 200,
     overflow: 'hidden',
-    zIndex: 1000,
   },
   dropdownItem: {
     paddingVertical: 14,

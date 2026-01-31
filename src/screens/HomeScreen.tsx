@@ -7,9 +7,9 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { CrossPlatformAlert as Alert } from '../utils/alert';
 import { COLORS } from '../theme/colors';
 import { getOrCreateUser } from '../services/database';
 
