@@ -6,10 +6,10 @@ import {
     ScrollView,
     TouchableOpacity,
     TextInput,
+    Alert,
     ActivityIndicator,
     RefreshControl,
 } from 'react-native';
-import { CrossPlatformAlert as Alert } from '../utils/alert';
 import { COLORS } from '../theme/colors';
 import {
     getUserCommunity,

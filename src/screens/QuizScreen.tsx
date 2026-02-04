@@ -44,8 +44,6 @@ export default function QuizScreen({
   const [opponentElo, setOpponentElo] = useState(1200);
   const [userElo, setUserElo] = useState(1200);
 
-  // Track opponent's progress separately
-  const [opponentQuestionIndex, setOpponentQuestionIndex] = useState(0);
   // Track which questions have been processed to avoid duplicate counting
   const processedOpponentQuestions = React.useRef<Set<number>>(new Set());
 
@@ -205,11 +203,10 @@ export default function QuizScreen({
 
                 console.log('Opponent answered question', questionIndex, '! Correct:', opponentCorrect);
 
-                // Update opponent score and question progress
+                // Update opponent score
                 if (opponentCorrect) {
                   setOpponentScore((prev) => prev + 1);
                 }
-                setOpponentQuestionIndex(questionIndex + 1);
                 setOpponentAnswered(true);
               }
             }
@@ -411,16 +408,14 @@ export default function QuizScreen({
               totalQuestions={currentIndex}
               isYou={true}
               avatar="😊"
-              style={{ flex: 1 }}
             />
             <PlayerCard
               username={opponentUsername}
               elo={opponentElo}
               currentScore={opponentScore}
-              totalQuestions={opponentQuestionIndex}
+              totalQuestions={currentIndex}
               isYou={false}
               avatar="🤖"
-              style={{ flex: 1 }}
             />
           </View>
 

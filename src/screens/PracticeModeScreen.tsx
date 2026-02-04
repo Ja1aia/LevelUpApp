@@ -6,14 +6,13 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Alert,
   Dimensions,
 } from 'react-native';
-import { CrossPlatformAlert as Alert } from '../utils/alert';
 import { COLORS } from '../theme/colors';
 import { Question, Answer } from '../types';
 import { TIMER_DURATION } from '../utils/questions';
 import { supabase } from '../lib/supabase';
-import { getQuestionsByElo } from '../services/database';
 import PlayerCard from '../components/PlayerCard';
 
 const { width } = Dimensions.get('window');
@@ -70,10 +69,22 @@ export default function PracticeModeScreen({
       const fetchedElo = userData?.elo || 1000;
       setUserElo(fetchedElo);
 
-      // Fetch questions using shared function (handles recent question filtering)
-      const fetchedQuestions = await getQuestionsByElo(fetchedElo, 10, [userId]);
+      // Fetch questions from RPC function (same as competitive mode)
+      const { data: questionsData, error: questionsError } = await supabase.rpc(
+        'get_questions_by_elo',
+        {
+          user_elo: fetchedElo,
+          limit_count: 10, // Practice with 10 questions
+        }
+      );
 
-      if (!fetchedQuestions || fetchedQuestions.length === 0) {
+      if (questionsError) {
+        console.error('Error fetching questions:', questionsError);
+        Alert.alert('Error', 'Failed to load practice questions. Please try again.');
+        return;
+      }
+
+      if (!questionsData || questionsData.length === 0) {
         Alert.alert(
           'No Questions Available',
           'There are not enough questions in the database for your skill level. Please try again later.',
@@ -82,8 +93,17 @@ export default function PracticeModeScreen({
         return;
       }
 
-      console.log('Practice questions loaded:', fetchedQuestions.length);
-      setQuestions(fetchedQuestions);
+      // Transform database format to app format
+      const transformedQuestions: Question[] = questionsData.map((q: any) => ({
+        id: q.id,
+        question: q.question_text,
+        options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+        correctAnswer: q.correct_answer,
+        topic: q.topic,
+      }));
+
+      console.log('Practice questions loaded:', transformedQuestions.length);
+      setQuestions(transformedQuestions);
       setLoadingQuestions(false);
       setQuestionStartTime(Date.now());
     } catch (error) {
@@ -224,6 +244,7 @@ export default function PracticeModeScreen({
           totalQuestions={currentIndex}
           isYou={true}
           avatar="😊"
+          style={{ flex: 0, width: '100%' }}
         />
       </View>
 

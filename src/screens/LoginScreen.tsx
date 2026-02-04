@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
   AppState,
   Platform,
 } from 'react-native';
-import { CrossPlatformAlert as Alert } from '../utils/alert';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -303,12 +303,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       }
 
       if (data.url) {
-        if (Platform.OS === 'web') {
-          // On web, Supabase already handles the redirect via skipBrowserRedirect: false
-          // No need to open another browser session
-          return;
-        }
-
         let authUrl = data.url;
         // Force prompt=consent to ensure account selection
         if (authUrl.includes('prompt=')) {
@@ -380,6 +374,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       <View style={styles.content}>
         {/* Logo/Title */}
         <View style={styles.header}>
+          <Text style={styles.logo}>🎮</Text>
           <Text style={styles.title}>LevelUP</Text>
           <Text style={styles.subtitle}>Math Quiz Battle</Text>
         </View>

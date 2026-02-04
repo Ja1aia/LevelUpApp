@@ -5,10 +5,10 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
+    Alert,
     ActivityIndicator,
     RefreshControl,
 } from 'react-native';
-import { CrossPlatformAlert as Alert } from '../utils/alert';
 import { COLORS } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import {

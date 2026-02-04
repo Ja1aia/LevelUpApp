@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, ActivityIndicator, View, Platform } from 'react-native';
-import { AlertProvider, CrossPlatformAlert as Alert } from './src/utils/alert';
+import { StyleSheet, ActivityIndicator, View, Alert, Platform } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
@@ -34,7 +33,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
-  const [userElo, setUserElo] = useState<number>(1000);
+  const [userElo, setUserElo] = useState<number>(1200);
   const [roomId, setRoomId] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -210,7 +209,6 @@ export default function App() {
   // Show loading screen while checking auth
   if (isCheckingAuth) {
     return (
-      <AlertProvider>
       <SafeAreaProvider>
         <SafeAreaView style={styles.container}>
           <View style={styles.loadingContainer}>
@@ -218,12 +216,10 @@ export default function App() {
           </View>
         </SafeAreaView>
       </SafeAreaProvider>
-      </AlertProvider>
     );
   }
 
   return (
-    <AlertProvider>
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
@@ -420,7 +416,6 @@ export default function App() {
         )}
       </SafeAreaView>
     </SafeAreaProvider>
-    </AlertProvider>
   );
 }
 

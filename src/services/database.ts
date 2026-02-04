@@ -93,83 +93,23 @@ export async function updateUserStats(
 // ==================== QUESTIONS ====================
 
 /**
- * Get question IDs that a user has recently answered
- * by looking at their recent rooms (last 10 games)
+ * Get 5 questions based on user ELO
+ * Returns questions closest to user's ELO
  */
-async function getRecentQuestionIdsForUsers(userIds: string[]): Promise<Set<string>> {
+export async function getQuestionsByElo(userElo: number): Promise<Question[]> {
   try {
-    // Build OR filter for all user IDs
-    const orFilter = userIds
-      .map(id => `host_id.eq.${id},guest_id.eq.${id}`)
-      .join(',');
-
-    const { data: recentRooms } = await supabase
-      .from('rooms')
-      .select('questions')
-      .or(orFilter)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (!recentRooms) return new Set();
-
-    const ids = new Set<string>();
-    for (const room of recentRooms) {
-      if (room.questions) {
-        const questions = typeof room.questions === 'string'
-          ? JSON.parse(room.questions)
-          : room.questions;
-        for (const q of questions) {
-          if (q.id) ids.add(q.id);
-        }
-      }
-    }
-    return ids;
-  } catch {
-    return new Set();
-  }
-}
-
-/**
- * Get questions based on user ELO, avoiding recently answered ones
- * Queries recent rooms from server to find already-answered question IDs
- * optionally pass guestId to also exclude questions the opponent has seen
- */
-export async function getQuestionsByElo(
-  userElo: number,
-  count: number = 5,
-  userIds: string[] = []
-): Promise<Question[]> {
-  try {
-    // Get recently answered question IDs from server
-    const recentIds = userIds.length > 0
-      ? await getRecentQuestionIdsForUsers(userIds)
-      : new Set<string>();
-
-    // Fetch more questions than needed so we can filter out recent ones
-    const fetchCount = Math.min(count + recentIds.size, 50);
-
+    // Use RPC to get questions sorted by ELO proximity on the server
     const { data, error } = await supabase.rpc('get_questions_by_elo', {
       user_elo: userElo,
-      limit_count: fetchCount
+      limit_count: 5
     });
 
     if (error) throw error;
 
     if (!data || data.length === 0) return [];
 
-    // Filter out recently answered questions
-    let filtered = data.filter((q: any) => !recentIds.has(q.id));
-
-    // If not enough after filtering, include some repeats
-    if (filtered.length < count) {
-      const remaining = data.filter((q: any) => recentIds.has(q.id));
-      filtered = [...filtered, ...remaining].slice(0, count);
-    } else {
-      filtered = filtered.slice(0, count);
-    }
-
     // Map to Question type
-    return filtered.map((q: any) => ({
+    return data.map((q: any) => ({
       id: q.id,
       question: q.question_text,
       options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
@@ -200,7 +140,7 @@ export async function createRoom(hostId: string, roomCode: string) {
     const hostElo = host?.elo || 1200;
 
     // 2. Get questions for this match
-    const questions = await getQuestionsByElo(hostElo, 5, [hostId]);
+    const questions = await getQuestionsByElo(hostElo);
 
     // 3. Create room with questions
     const { data, error } = await supabase
@@ -245,19 +185,14 @@ export async function joinRoom(roomCode: string, guestId: string) {
       return { data: null, error: fetchError || new Error('Room not found') };
     }
 
-    // Build update data - only set guest_id if not already set
-    // (tournament rooms pre-set guest_id during room creation)
-    const updateData: any = {
-      status: 'playing',
-      started_at: new Date().toISOString(),
-    };
-    if (!room.guest_id) {
-      updateData.guest_id = guestId;
-    }
-
+    // Update room with guest and change status
     const { data: updated, error: updateError } = await supabase
       .from('rooms')
-      .update(updateData)
+      .update({
+        guest_id: guestId,
+        status: 'playing',
+        started_at: new Date().toISOString(),
+      })
       .eq('id', room.id)
       .select()
       .single();
@@ -328,12 +263,6 @@ export async function updateRoomStatus(
  */
 export async function joinMatchmakingQueue(userId: string, userElo: number) {
   try {
-    // First, clean up any old entries for this user (in case of stale data)
-    await supabase
-      .from('matchmaking_queue')
-      .delete()
-      .eq('user_id', userId);
-
     // Insert user into matchmaking queue
     const { data, error } = await supabase
       .from('matchmaking_queue')
@@ -346,6 +275,10 @@ export async function joinMatchmakingQueue(userId: string, userElo: number) {
       .single();
 
     if (error) {
+      // If error is due to unique constraint (user already in queue), that's ok
+      if (error.code === '23505') {
+        return { data: null, error: new Error('You are already in the matchmaking queue') };
+      }
       throw error;
     }
 
@@ -2154,7 +2087,7 @@ export async function createTournamentMatchRoom(
       .single();
 
     const userElo = user?.elo || 1200;
-    const questions = await getQuestionsByElo(userElo, 5, [match.player1_id, match.player2_id].filter(Boolean));
+    const questions = await getQuestionsByElo(userElo);
 
     // Create room
     const roomCode = generateRoomCode();
