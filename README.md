@@ -2,9 +2,12 @@
 
 Multiplayer math quiz application with timer and scoring system.
 
-![Home Screen](photo/lobby.png)
+## 📱 App Screenshots
 
-![Match Screen](photo/battle.png)
+| Home | Battle |
+|:----:|:------:|
+| <img src="photo/lobby.png" width="250" alt="Home Screen"> | <img src="photo/battle.png" width="250" alt="Battle Screen"> |
+
 
 ## Features
 
