@@ -1,6 +1,10 @@
 # LevelUp - Math Quiz App
 
-Single player math quiz application with timer and scoring system.
+Multiplayer math quiz application with timer and scoring system.
+
+![Home Screen](photo/lobby.png)
+
+![Match Screen](photo/battle.png)
 
 ## Features
 
